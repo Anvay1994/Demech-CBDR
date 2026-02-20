@@ -570,6 +570,8 @@ body::before {
 
 .report-table-wrapper {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 75vh;
 }
 
 .report-table {
@@ -586,11 +588,12 @@ body::before {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--card-bg, #1a1a2e);
   border-bottom: 1px solid var(--border-glass);
   white-space: nowrap;
   position: sticky;
   top: 0;
+  z-index: 10;
 }
 
 .report-table tbody td {
