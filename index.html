@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demech CBDR — Report Portal</title>
+  <meta name="description" content="Demech Centrifugal Basalt Cast Pipe — Production & Quality Report Portal">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏭</text></svg>">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-logo">
+        <h1>🏭 DEMECH</h1>
+        <p>Centrifugal Basalt Cast Pipe — Report Portal</p>
+      </div>
+      <form id="loginForm" onsubmit="return handleLogin(event)">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" placeholder="Enter username" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Sign In</button>
+        <p id="loginError" class="login-error">Invalid username or password</p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Check if already logged in
+    if (sessionStorage.getItem('demech_auth') === 'true') {
+      window.location.href = 'dashboard.html';
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      // Simple authentication
+      if (username === 'demech' && password === 'demech2025') {
+        sessionStorage.setItem('demech_auth', 'true');
+        sessionStorage.setItem('demech_user', username);
+        window.location.href = 'dashboard.html';
+      } else {
+        const errorEl = document.getElementById('loginError');
+        errorEl.classList.add('show');
+        setTimeout(() => errorEl.classList.remove('show'), 3000);
+      }
+      return false;
+    }
+  </script>
+</body>
+</html>

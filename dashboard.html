@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demech CBDR — Dashboard</title>
+    <meta name="description" content="Demech Production & Quality Reports Dashboard">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏭</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+
+        <!-- ========== TOP NAV ========== -->
+        <nav class="top-nav">
+            <div class="nav-brand">
+                <div>
+                    <h2>🏭 DEMECH CBDR</h2>
+                    <span class="subtitle">Centrifugal Basalt Cast Pipe — Report Portal</span>
+                </div>
+            </div>
+            <div class="nav-actions">
+                <span class="refresh-info" id="refreshTime">Loading...</span>
+                <button class="btn btn-secondary btn-sm" onclick="initApp()" title="Refresh data">↻ Refresh</button>
+                <button class="btn-logout" onclick="logout()">Logout</button>
+            </div>
+        </nav>
+
+        <!-- ========== PAGE TABS ========== -->
+        <div class="page-tabs">
+            <div class="page-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="page-tab" data-tab="production" onclick="switchTab('production')">📋 Production Report</div>
+            <div class="page-tab" data-tab="quality" onclick="switchTab('quality')">🔍 Quality Report</div>
+            <div class="page-tab" data-tab="dataquality" onclick="switchTab('dataquality')">⚠ Data Quality <span
+                    class="error-badge" id="errorBadge" style="display:none;">0</span></div>
+        </div>
+
+        <!-- ========== FILTERS BAR ========== -->
+        <div class="main-content">
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label>Date From</label>
+                    <input type="date" id="filterDateFrom" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label>Date To</label>
+                    <input type="date" id="filterDateTo" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label>Shift</label>
+                    <select id="filterShift" onchange="applyFilters()">
+                        <option value="all">All Shifts</option>
+                        <option value="I">Shift I</option>
+                        <option value="II">Shift II</option>
+                        <option value="III">Shift III</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Supervisor</label>
+                    <select id="filterSupervisor" onchange="applyFilters()">
+                        <option value="all">All Supervisors</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Pipe Size</label>
+                    <select id="filterPipeSize" onchange="applyFilters()">
+                        <option value="all">All Sizes</option>
+                    </select>
+                </div>
+                <div class="filter-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="resetFilters()">✕ Reset</button>
+                </div>
+            </div>
+
+            <!-- ========== LOADING ========== -->
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="spinner"></div>
+                <span class="loading-text">Loading live data from Google Sheets...</span>
+            </div>
+
+            <!-- ===================================================
+           SECTION: DASHBOARD
+           =================================================== -->
+            <div id="section-dashboard" class="page-section active">
+
+                <!-- KPI Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card blue">
+                        <div class="kpi-label">Total Pipes Produced</div>
+                        <div class="kpi-value" id="kpiTotalPipes">—</div>
+                        <div class="kpi-sub" id="kpiSubPipes">loading...</div>
+                    </div>
+                    <div class="kpi-card green">
+                        <div class="kpi-label">Acceptance Rate</div>
+                        <div class="kpi-value" id="kpiAcceptRate">—</div>
+                        <div class="kpi-sub">of total production</div>
+                    </div>
+                    <div class="kpi-card red">
+                        <div class="kpi-label">Rejection Rate</div>
+                        <div class="kpi-value" id="kpiRejectRate">—</div>
+                        <div class="kpi-sub">needs attention if &gt; 15%</div>
+                    </div>
+                    <div class="kpi-card amber">
+                        <div class="kpi-label">Total Weight</div>
+                        <div class="kpi-value" id="kpiTotalWeight">—</div>
+                        <div class="kpi-sub">all pipe sizes combined</div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h4>📊 Accepted vs Rejected (Daily)</h4>
+                        <div style="height: 300px;">
+                            <canvas id="chartAccRej"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h4>🔴 Defect Type Breakdown</h4>
+                        <div style="height: 300px;">
+                            <canvas id="chartDefects"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card" style="grid-column: 1 / -1;">
+                        <h4>👷 Supervisor Performance Comparison</h4>
+                        <div style="height: 300px;">
+                            <canvas id="chartSupervisor"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================================================
+           SECTION: PRODUCTION REPORT
+           =================================================== -->
+            <div id="section-production" class="page-section">
+
+                <div class="section-header">
+                    <h3>Summary Report: Production report supervisor wise</h3>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <span class="badge" id="prodReportCount">—</span>
+                        <button class="btn btn-secondary btn-sm" onclick="exportCSV('production')">⬇ Export CSV</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-title">Detailed Production Report — Daily / Shift / Supervisor wise</div>
+                    <div class="report-table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Sr.No.</th>
+                                    <th>Date</th>
+                                    <th>Shift</th>
+                                    <th>Production Supervisor Name</th>
+                                    <th>Name</th>
+                                    <th>CB Pipe Size</th>
+                                    <th>Total Qty (Nos.)</th>
+                                    <th>Accepted Qty (Nos.)</th>
+                                    <th>Rejected Qty (Nos.)</th>
+                                    <th>Total Weight (Kg.)</th>
+                                    <th>Accepted Weight (Kg.)</th>
+                                    <th>Rejected Weight (Kg.)</th>
+                                    <th>Rejected %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="prodReportBody">
+                                <tr>
+                                    <td colspan="13" class="loading-text" style="text-align:center; padding:2rem;">
+                                        Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Summary Table -->
+                <div class="table-container summary-table-container">
+                    <div class="table-title">Supervisor Summary — Daily / Monthly / Yearly</div>
+                    <div class="report-table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Sr.No.</th>
+                                    <th>Production Supervisor Name</th>
+                                    <th>Type</th>
+                                    <th>Total Weight (Kg.)</th>
+                                    <th>Accepted Weight (Kg.)</th>
+                                    <th>Rejected Weight (Kg.)</th>
+                                    <th>Rejected %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="prodSummaryBody">
+                                <tr>
+                                    <td colspan="7" class="loading-text" style="text-align:center; padding:2rem;">
+                                        Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================================================
+           SECTION: QUALITY REPORT
+           =================================================== -->
+            <div id="section-quality" class="page-section">
+
+                <div class="section-header">
+                    <h3>Summary Report: Quality report supervisor wise</h3>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <span class="badge" id="qualReportCount">—</span>
+                        <button class="btn btn-secondary btn-sm" onclick="exportCSV('quality')">⬇ Export CSV</button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-title">Detailed Quality Report — Daily / Shift / Supervisor wise</div>
+                    <div class="report-table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Sr.No.</th>
+                                    <th>Date</th>
+                                    <th>Shift</th>
+                                    <th>Quality Supervisor Name</th>
+                                    <th>Production Supervisor Name</th>
+                                    <th>CB Pipe Size</th>
+                                    <th>Total Qty (Nos.)</th>
+                                    <th>Accepted Qty (Nos.)</th>
+                                    <th>Rejected Qty (Nos.)</th>
+                                    <th>Total Weight (Kg.)</th>
+                                    <th>Accepted Weight (Kg.)</th>
+                                    <th>Rejected Weight (Kg.)</th>
+                                    <th>Rejected %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="qualReportBody">
+                                <tr>
+                                    <td colspan="13" class="loading-text" style="text-align:center; padding:2rem;">
+                                        Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Quality Summary Table -->
+                <div class="table-container summary-table-container">
+                    <div class="table-title">Quality Supervisor Summary</div>
+                    <div class="report-table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Sr.No.</th>
+                                    <th>Date</th>
+                                    <th>Shift</th>
+                                    <th>Quality Supervisor Name</th>
+                                    <th>Total Weight (Kg.)</th>
+                                    <th>Accepted Weight (Kg.)</th>
+                                    <th>Rejected Weight (Kg.)</th>
+                                    <th>Rejected %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="qualSummaryBody">
+                                <tr>
+                                    <td colspan="8" class="loading-text" style="text-align:center; padding:2rem;">
+                                        Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================================================
+           SECTION: DATA QUALITY
+           =================================================== -->
+            <div id="section-dataquality" class="page-section">
+
+                <div class="section-header">
+                    <h3>⚠ Data Quality Report</h3>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <span class="badge" id="dqReportCount">—</span>
+                    </div>
+                </div>
+
+                <!-- DQ KPI Cards -->
+                <div class="kpi-grid dq-kpi-grid">
+                    <div class="kpi-card red">
+                        <div class="kpi-label">Errors</div>
+                        <div class="kpi-value" id="dqErrors">0</div>
+                        <div class="kpi-sub">critical issues</div>
+                    </div>
+                    <div class="kpi-card amber">
+                        <div class="kpi-label">Warnings</div>
+                        <div class="kpi-value" id="dqWarnings">0</div>
+                        <div class="kpi-sub">needs review</div>
+                    </div>
+                    <div class="kpi-card green">
+                        <div class="kpi-label">Records Checked</div>
+                        <div class="kpi-value" id="dqChecked">0</div>
+                        <div class="kpi-sub">total rows scanned</div>
+                    </div>
+                    <div class="kpi-card blue">
+                        <div class="kpi-label">Data Health</div>
+                        <div class="kpi-value" id="dqHealth">—</div>
+                        <div class="kpi-sub">overall quality score</div>
+                    </div>
+                </div>
+
+                <!-- Error Flags Table -->
+                <div class="table-container">
+                    <div class="table-title">Detected Issues</div>
+                    <div class="report-table-wrapper">
+                        <table class="report-table dq-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:60px;">#</th>
+                                    <th style="width:90px;">Severity</th>
+                                    <th style="width:160px;">Type</th>
+                                    <th>Details</th>
+                                    <th style="width:120px;">Date</th>
+                                    <th style="width:140px;">Affected</th>
+                                    <th style="width:120px;">Sheet Row(s)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dqReportBody">
+                                <tr>
+                                    <td colspan="7" class="loading-text" style="text-align:center; padding:2rem;">
+                                        Running checks...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end .main-content -->
+    </div><!-- end .app-container -->
+
+    <script src="app.js"></script>
+    <script>
+        // Initialize the app on page load
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+
+</html>
