@@ -853,13 +853,24 @@ function renderAcceptRejectChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } }
+                legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } },
+                datalabels: {
+                    color: '#e0e0f0',
+                    font: { size: 10, weight: 'bold', family: 'Inter' },
+                    anchor: 'end',
+                    align: 'top',
+                    offset: -2,
+                    display: function (ctx) {
+                        return ctx.dataset.data[ctx.dataIndex] > 0;
+                    }
+                }
             },
             scales: {
                 x: { ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
                 y: { ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
-        }
+        },
+        plugins: [ChartDataLabels]
     });
 }
 
@@ -873,6 +884,8 @@ function renderDefectsChart() {
         Ovality: data.reduce((s, r) => s + r.ovality, 0),
         Others: data.reduce((s, r) => s + r.others, 0),
     };
+
+    const totalDefects = Object.values(totals).reduce((a, b) => a + b, 0);
 
     const ctx = document.getElementById('chartDefects');
     if (!ctx) return;
@@ -903,9 +916,23 @@ function renderDefectsChart() {
                 legend: {
                     position: 'right',
                     labels: { color: '#8888a8', font: { family: 'Inter', size: 11 }, padding: 12 }
+                },
+                datalabels: {
+                    color: '#ffffff',
+                    font: { size: 11, weight: 'bold', family: 'Inter' },
+                    formatter: function (value) {
+                        if (value === 0) return '';
+                        const pct = totalDefects > 0 ? ((value / totalDefects) * 100).toFixed(1) : 0;
+                        return value + '\n(' + pct + '%)';
+                    },
+                    textAlign: 'center',
+                    display: function (ctx) {
+                        return ctx.dataset.data[ctx.dataIndex] > 0;
+                    }
                 }
             }
-        }
+        },
+        plugins: [ChartDataLabels]
     });
 }
 
@@ -915,15 +942,18 @@ function renderSupervisorChart() {
     const supGroups = {};
     data.forEach(row => {
         if (!supGroups[row.supervisor]) {
-            supGroups[row.supervisor] = { accepted: 0, rejected: 0 };
+            supGroups[row.supervisor] = { totalPipes: 0, rejected: 0 };
         }
-        supGroups[row.supervisor].accepted += row.accepted;
+        supGroups[row.supervisor].totalPipes += row.totalPipes;
         supGroups[row.supervisor].rejected += row.rejected;
     });
 
     const labels = Object.keys(supGroups);
-    const acceptedVals = labels.map(s => supGroups[s].accepted);
-    const rejectedVals = labels.map(s => supGroups[s].rejected);
+    const totalProdVals = labels.map(s => supGroups[s].totalPipes);
+    const rejPctVals = labels.map(s => {
+        const g = supGroups[s];
+        return g.totalPipes > 0 ? parseFloat(((g.rejected / g.totalPipes) * 100).toFixed(1)) : 0;
+    });
 
     const ctx = document.getElementById('chartSupervisor');
     if (!ctx) return;
@@ -936,31 +966,84 @@ function renderSupervisorChart() {
             labels,
             datasets: [
                 {
-                    label: 'Accepted',
-                    data: acceptedVals,
-                    backgroundColor: 'rgba(46, 196, 182, 0.7)',
+                    label: 'Total Production (Nos.)',
+                    data: totalProdVals,
+                    backgroundColor: 'rgba(67, 97, 238, 0.6)',
+                    borderColor: '#4361ee',
+                    borderWidth: 1,
                     borderRadius: 4,
+                    yAxisID: 'y',
+                    order: 2,
+                    datalabels: {
+                        color: '#a0b0ff',
+                        anchor: 'end',
+                        align: 'top',
+                        offset: -2,
+                        font: { size: 10, weight: 'bold', family: 'Inter' }
+                    }
                 },
                 {
-                    label: 'Rejected',
-                    data: rejectedVals,
-                    backgroundColor: 'rgba(230, 57, 70, 0.7)',
-                    borderRadius: 4,
+                    label: 'Rejected %',
+                    data: rejPctVals,
+                    type: 'line',
+                    borderColor: '#e63946',
+                    backgroundColor: 'rgba(230, 57, 70, 0.1)',
+                    pointBackgroundColor: '#e63946',
+                    pointBorderColor: '#fff',
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.3,
+                    yAxisID: 'y1',
+                    order: 1,
+                    datalabels: {
+                        color: '#ff6b7a',
+                        anchor: 'end',
+                        align: 'top',
+                        offset: 4,
+                        font: { size: 11, weight: 'bold', family: 'Inter' },
+                        formatter: function (value) {
+                            return value + '%';
+                        }
+                    }
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            indexAxis: 'y',
             plugins: {
-                legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } }
+                legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } },
+                datalabels: {
+                    display: function (ctx) {
+                        return ctx.dataset.data[ctx.dataIndex] > 0;
+                    }
+                }
             },
             scales: {
-                x: { stacked: true, ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                y: { stacked: true, ticks: { color: '#8888a8', font: { size: 10 } }, grid: { display: false } }
+                x: {
+                    ticks: { color: '#8888a8', font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
+                },
+                y: {
+                    type: 'linear',
+                    position: 'left',
+                    title: { display: true, text: 'Total Production (Nos.)', color: '#8888a8', font: { size: 11 } },
+                    ticks: { color: '#5a5a7a' },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
+                },
+                y1: {
+                    type: 'linear',
+                    position: 'right',
+                    title: { display: true, text: 'Rejected %', color: '#e63946', font: { size: 11 } },
+                    ticks: { color: '#e63946', callback: function (v) { return v + '%'; } },
+                    grid: { drawOnChartArea: false },
+                    min: 0
+                }
             }
-        }
+        },
+        plugins: [ChartDataLabels]
     });
 }
 
