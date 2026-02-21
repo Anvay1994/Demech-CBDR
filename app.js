@@ -826,6 +826,31 @@ function renderAcceptRejectChart() {
 
     if (chartAccRej) chartAccRej.destroy();
 
+    // Custom plugin to draw total + rejected % on top of stacked bar
+    const stackedTopLabels = {
+        id: 'stackedTopLabels1',
+        afterDatasetsDraw(chart) {
+            const { ctx: c, scales } = chart;
+            const meta0 = chart.getDatasetMeta(0); // Accepted
+            const meta1 = chart.getDatasetMeta(1); // Rejected
+            c.save();
+            meta1.data.forEach((bar, i) => {
+                const acc = acceptedVals[i] || 0;
+                const rej = rejectedVals[i] || 0;
+                const total = acc + rej;
+                const rejPct = total > 0 ? ((rej / total) * 100).toFixed(1) : '0.0';
+                c.fillStyle = '#e0e0f0';
+                c.font = 'bold 11px Inter';
+                c.textAlign = 'center';
+                c.fillText(`Total: ${total}`, bar.x, bar.y - 16);
+                c.fillStyle = '#ff6b7a';
+                c.font = 'bold 10px Inter';
+                c.fillText(`Rej: ${rejPct}%`, bar.x, bar.y - 4);
+            });
+            c.restore();
+        }
+    };
+
     chartAccRej = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -834,18 +859,18 @@ function renderAcceptRejectChart() {
                 {
                     label: 'Accepted',
                     data: acceptedVals,
-                    backgroundColor: 'rgba(46, 196, 182, 0.7)',
+                    backgroundColor: 'rgba(46, 196, 182, 0.75)',
                     borderColor: '#2ec4b6',
-                    borderWidth: 1,
-                    borderRadius: 4,
+                    borderWidth: 0,
+                    borderRadius: { topLeft: 0, topRight: 0 },
                 },
                 {
                     label: 'Rejected',
                     data: rejectedVals,
-                    backgroundColor: 'rgba(230, 57, 70, 0.7)',
+                    backgroundColor: 'rgba(230, 57, 70, 0.8)',
                     borderColor: '#e63946',
-                    borderWidth: 1,
-                    borderRadius: 4,
+                    borderWidth: 0,
+                    borderRadius: { topLeft: 4, topRight: 4 },
                 }
             ]
         },
@@ -855,22 +880,21 @@ function renderAcceptRejectChart() {
             plugins: {
                 legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } },
                 datalabels: {
-                    color: '#e0e0f0',
+                    color: '#ffffff',
                     font: { size: 10, weight: 'bold', family: 'Inter' },
-                    anchor: 'end',
-                    align: 'top',
-                    offset: -2,
+                    anchor: 'center',
+                    align: 'center',
                     display: function (ctx) {
                         return ctx.dataset.data[ctx.dataIndex] > 0;
                     }
                 }
             },
             scales: {
-                x: { ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                y: { ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                x: { stacked: true, ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { stacked: true, ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
         },
-        plugins: [ChartDataLabels]
+        plugins: [ChartDataLabels, stackedTopLabels]
     });
 }
 
@@ -942,23 +966,44 @@ function renderSupervisorChart() {
     const supGroups = {};
     data.forEach(row => {
         if (!supGroups[row.supervisor]) {
-            supGroups[row.supervisor] = { totalPipes: 0, rejected: 0 };
+            supGroups[row.supervisor] = { accepted: 0, rejected: 0 };
         }
-        supGroups[row.supervisor].totalPipes += row.totalPipes;
+        supGroups[row.supervisor].accepted += row.accepted;
         supGroups[row.supervisor].rejected += row.rejected;
     });
 
     const labels = Object.keys(supGroups);
-    const totalProdVals = labels.map(s => supGroups[s].totalPipes);
-    const rejPctVals = labels.map(s => {
-        const g = supGroups[s];
-        return g.totalPipes > 0 ? parseFloat(((g.rejected / g.totalPipes) * 100).toFixed(1)) : 0;
-    });
+    const acceptedVals = labels.map(s => supGroups[s].accepted);
+    const rejectedVals = labels.map(s => supGroups[s].rejected);
 
     const ctx = document.getElementById('chartSupervisor');
     if (!ctx) return;
 
     if (chartSupervisor) chartSupervisor.destroy();
+
+    // Custom plugin to draw total + rejected % on top of stacked bar
+    const stackedTopLabels = {
+        id: 'stackedTopLabels2',
+        afterDatasetsDraw(chart) {
+            const { ctx: c } = chart;
+            const meta1 = chart.getDatasetMeta(1); // Rejected (top)
+            c.save();
+            meta1.data.forEach((bar, i) => {
+                const acc = acceptedVals[i] || 0;
+                const rej = rejectedVals[i] || 0;
+                const total = acc + rej;
+                const rejPct = total > 0 ? ((rej / total) * 100).toFixed(1) : '0.0';
+                c.fillStyle = '#e0e0f0';
+                c.font = 'bold 11px Inter';
+                c.textAlign = 'center';
+                c.fillText(`Total: ${total}`, bar.x, bar.y - 16);
+                c.fillStyle = '#ff6b7a';
+                c.font = 'bold 10px Inter';
+                c.fillText(`Rej: ${rejPct}%`, bar.x, bar.y - 4);
+            });
+            c.restore();
+        }
+    };
 
     chartSupervisor = new Chart(ctx, {
         type: 'bar',
@@ -966,47 +1011,18 @@ function renderSupervisorChart() {
             labels,
             datasets: [
                 {
-                    label: 'Total Production (Nos.)',
-                    data: totalProdVals,
-                    backgroundColor: 'rgba(67, 97, 238, 0.6)',
-                    borderColor: '#4361ee',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                    yAxisID: 'y',
-                    order: 2,
-                    datalabels: {
-                        color: '#a0b0ff',
-                        anchor: 'end',
-                        align: 'top',
-                        offset: -2,
-                        font: { size: 10, weight: 'bold', family: 'Inter' }
-                    }
+                    label: 'Accepted',
+                    data: acceptedVals,
+                    backgroundColor: 'rgba(46, 196, 182, 0.75)',
+                    borderWidth: 0,
+                    borderRadius: { topLeft: 0, topRight: 0 },
                 },
                 {
-                    label: 'Rejected %',
-                    data: rejPctVals,
-                    type: 'line',
-                    borderColor: '#e63946',
-                    backgroundColor: 'rgba(230, 57, 70, 0.1)',
-                    pointBackgroundColor: '#e63946',
-                    pointBorderColor: '#fff',
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.3,
-                    yAxisID: 'y1',
-                    order: 1,
-                    datalabels: {
-                        color: '#ff6b7a',
-                        anchor: 'end',
-                        align: 'top',
-                        offset: 4,
-                        font: { size: 11, weight: 'bold', family: 'Inter' },
-                        formatter: function (value) {
-                            return value + '%';
-                        }
-                    }
+                    label: 'Rejected',
+                    data: rejectedVals,
+                    backgroundColor: 'rgba(230, 57, 70, 0.8)',
+                    borderWidth: 0,
+                    borderRadius: { topLeft: 4, topRight: 4 },
                 }
             ]
         },
@@ -1016,34 +1032,21 @@ function renderSupervisorChart() {
             plugins: {
                 legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } },
                 datalabels: {
+                    color: '#ffffff',
+                    font: { size: 10, weight: 'bold', family: 'Inter' },
+                    anchor: 'center',
+                    align: 'center',
                     display: function (ctx) {
                         return ctx.dataset.data[ctx.dataIndex] > 0;
                     }
                 }
             },
             scales: {
-                x: {
-                    ticks: { color: '#8888a8', font: { size: 10 } },
-                    grid: { color: 'rgba(255,255,255,0.04)' }
-                },
-                y: {
-                    type: 'linear',
-                    position: 'left',
-                    title: { display: true, text: 'Total Production (Nos.)', color: '#8888a8', font: { size: 11 } },
-                    ticks: { color: '#5a5a7a' },
-                    grid: { color: 'rgba(255,255,255,0.04)' }
-                },
-                y1: {
-                    type: 'linear',
-                    position: 'right',
-                    title: { display: true, text: 'Rejected %', color: '#e63946', font: { size: 11 } },
-                    ticks: { color: '#e63946', callback: function (v) { return v + '%'; } },
-                    grid: { drawOnChartArea: false },
-                    min: 0
-                }
+                x: { stacked: true, ticks: { color: '#8888a8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { stacked: true, ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
         },
-        plugins: [ChartDataLabels]
+        plugins: [ChartDataLabels, stackedTopLabels]
     });
 }
 
