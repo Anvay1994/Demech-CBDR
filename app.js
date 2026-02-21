@@ -365,15 +365,17 @@ function applyFilters() {
     const pipeSize = document.getElementById('filterPipeSize')?.value;
 
     filteredData = allData.filter(row => {
-        // Date filter
+        // Date filter — parse as local dates to avoid UTC shift
         if (dateFrom) {
             const rowDate = parseDate(row.date);
-            const fromDate = new Date(dateFrom);
+            const parts = dateFrom.split('-'); // yyyy-mm-dd from input
+            const fromDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             if (rowDate && rowDate < fromDate) return false;
         }
         if (dateTo) {
             const rowDate = parseDate(row.date);
-            const toDate = new Date(dateTo);
+            const parts = dateTo.split('-'); // yyyy-mm-dd from input
+            const toDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             if (rowDate && rowDate > toDate) return false;
         }
         // Shift filter
@@ -1521,15 +1523,20 @@ function setDefaultDateRange() {
     if (dateFromEl.value || dateToEl.value) return;
 
     // Find the latest date in data
-    const allDates = allData.map(r => parseDate(r.date)).filter(d => d);
+    const allDates = allData.map(r => parseDate(r.date)).filter(d => d && !isNaN(d.getTime()));
     if (allDates.length === 0) return;
 
     const maxDate = new Date(Math.max(...allDates));
     const fromDate = new Date(maxDate);
     fromDate.setDate(fromDate.getDate() - 6); // 7 days including maxDate
 
-    // Format as yyyy-mm-dd for date input
-    const fmt = (d) => d.toISOString().slice(0, 10);
+    // Format as yyyy-mm-dd for HTML date input (using local timezone)
+    const fmt = (d) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    };
     dateFromEl.value = fmt(fromDate);
     dateToEl.value = fmt(maxDate);
 }
