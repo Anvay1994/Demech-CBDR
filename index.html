@@ -4,32 +4,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Demech CBDR — Report Portal</title>
-  <meta name="description" content="Demech Centrifugal Basalt Cast Pipe — Production & Quality Report Portal">
+  <title>Demech — Report Portal</title>
+  <meta name="description" content="Demech Centrifugal Cast Basalt Pipe Production — Report Portal">
   <link rel="stylesheet" href="styles.css">
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏭</text></svg>">
 </head>
 
 <body>
+  <!-- Animated particles background -->
+  <div class="login-particles" id="loginParticles"></div>
+
   <div class="login-container">
     <div class="login-card">
       <div class="login-logo">
-        <h1>🏭 DEMECH</h1>
-        <p>Centrifugal Basalt Cast Pipe — Report Portal</p>
+        <img src="Logo _ DEMECH New[2].png" alt="Demech Logo" class="login-logo-img">
+        <div class="login-divider"></div>
+        <p>Centrifugal Cast Basalt Pipe Production<br><span class="login-subtitle-small">Report Portal</span></p>
       </div>
       <form id="loginForm" onsubmit="return handleLogin(event)">
         <div class="form-group">
           <label for="username">Username</label>
-          <input type="text" id="username" placeholder="Enter username" autocomplete="username" required>
+          <div class="input-with-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <input type="text" id="username" placeholder="Enter username" autocomplete="username" required>
+          </div>
         </div>
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" required>
+          <div class="input-with-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" required>
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary">Sign In</button>
+        <button type="submit" class="btn btn-primary login-btn">
+          <span>Sign In</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </button>
         <p id="loginError" class="login-error">Invalid username or password</p>
       </form>
+      <div class="login-footer">
+        <span>Secured access · Demech Industries</span>
+      </div>
     </div>
   </div>
 
@@ -44,11 +68,13 @@
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
 
-      // Simple authentication
       if (username === 'demechcbdr' && password === 'CBDR2026') {
         sessionStorage.setItem('demech_auth', 'true');
         sessionStorage.setItem('demech_user', username);
-        window.location.href = 'dashboard.html';
+
+        // Add success animation before redirect
+        document.querySelector('.login-card').classList.add('login-success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
       } else {
         const errorEl = document.getElementById('loginError');
         errorEl.classList.add('show');
@@ -56,6 +82,23 @@
       }
       return false;
     }
+
+    // Particle animation
+    (function () {
+      const canvas = document.getElementById('loginParticles');
+      if (!canvas) return;
+      const container = document.querySelector('.login-container');
+      for (let i = 0; i < 30; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'particle';
+        dot.style.left = Math.random() * 100 + '%';
+        dot.style.top = Math.random() * 100 + '%';
+        dot.style.animationDelay = Math.random() * 6 + 's';
+        dot.style.animationDuration = (4 + Math.random() * 6) + 's';
+        dot.style.width = dot.style.height = (2 + Math.random() * 3) + 'px';
+        canvas.appendChild(dot);
+      }
+    })();
   </script>
 </body>
 
