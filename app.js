@@ -204,17 +204,26 @@ function transformReportData(rawData) {
         // Calculate rejected weight
         const rejectedWt = row['Rejected Wt'] !== undefined ? parseFloat(row['Rejected Wt']) : (totalWt - acceptedWt);
 
-        // Use Input Date — parse ISO UTC string to local date
+        // Use Input Date — handle both DD-MM-YYYY (from Apps Script) and ISO formats
         let rawDate = '';
-        const inputDate = row['Input Date'] || row['Date for Output'] || row['Date'] || '';
+        const inputDate = String(row['Input Date'] || row['Date for Output'] || row['Date'] || '').trim();
         if (inputDate) {
-            const d = new Date(inputDate);
-            if (!isNaN(d.getTime())) {
-                // Format as DD-MM-YYYY in local timezone
-                const dd = String(d.getDate()).padStart(2, '0');
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const yyyy = d.getFullYear();
-                rawDate = `${dd}-${mm}-${yyyy}`;
+            // Check if already in DD-MM-YYYY format (from Google Apps Script)
+            const ddmmyyyy = inputDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            if (ddmmyyyy) {
+                // Already DD-MM-YYYY from Apps Script, use directly
+                const dd = ddmmyyyy[1].padStart(2, '0');
+                const mm = ddmmyyyy[2].padStart(2, '0');
+                rawDate = `${dd}-${mm}-${ddmmyyyy[3]}`;
+            } else {
+                // ISO or other format — parse carefully
+                const d = new Date(inputDate);
+                if (!isNaN(d.getTime())) {
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const yyyy = d.getFullYear();
+                    rawDate = `${dd}-${mm}-${yyyy}`;
+                }
             }
         }
 
