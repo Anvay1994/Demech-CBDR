@@ -916,9 +916,9 @@ function renderDefectsChart() {
 
     if (chartDefects) chartDefects.destroy();
 
-    // Custom plugin to draw connector lines for outside labels
-    const doughnutLabelLines = {
-        id: 'doughnutLabelLines',
+    // Custom plugin: draw labels for small segments outside with collision-free leader lines
+    const doughnutOuterLabels = {
+        id: 'doughnutOuterLabels',
         afterDatasetsDraw(chart) {
             const { ctx: c } = chart;
             const dataset = chart.data.datasets[0];
@@ -926,25 +926,60 @@ function renderDefectsChart() {
             const total = dataset.data.reduce((a, b) => a + b, 0);
             if (total === 0) return;
 
-            c.save();
+            // Collect small-segment label info
+            const smallLabels = [];
             meta.data.forEach((arc, i) => {
                 const value = dataset.data[i];
                 const pct = (value / total) * 100;
-                if (pct >= 8 || value === 0) return; // Only for small segments
+                if (pct >= 8 || value === 0) return;
 
-                const { x, y, startAngle, endAngle, innerRadius, outerRadius } = arc.getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius']);
-                const midAngle = (startAngle + endAngle) / 2;
-                const edgeX = x + Math.cos(midAngle) * outerRadius;
-                const edgeY = y + Math.sin(midAngle) * outerRadius;
-                const outX = x + Math.cos(midAngle) * (outerRadius + 20);
-                const outY = y + Math.sin(midAngle) * (outerRadius + 20);
+                const props = arc.getProps(['x', 'y', 'startAngle', 'endAngle', 'outerRadius']);
+                const midAngle = (props.startAngle + props.endAngle) / 2;
+                const isRight = Math.cos(midAngle) >= 0;
+                const edgeX = props.x + Math.cos(midAngle) * props.outerRadius;
+                const edgeY = props.y + Math.sin(midAngle) * props.outerRadius;
+                const elbowX = props.x + Math.cos(midAngle) * (props.outerRadius + 14);
+                const elbowY = props.y + Math.sin(midAngle) * (props.outerRadius + 14);
+                const endX = isRight ? elbowX + 30 : elbowX - 30;
 
+                smallLabels.push({
+                    text: `${value} (${pct.toFixed(1)}%)`,
+                    edgeX, edgeY, elbowX, elbowY, endX,
+                    naturalY: elbowY,
+                    y: elbowY,
+                    isRight
+                });
+            });
+
+            // Sort by natural Y position and spread overlapping labels
+            smallLabels.sort((a, b) => a.naturalY - b.naturalY);
+            const minGap = 18;
+            for (let i = 1; i < smallLabels.length; i++) {
+                const prev = smallLabels[i - 1];
+                const curr = smallLabels[i];
+                if (curr.y - prev.y < minGap) {
+                    curr.y = prev.y + minGap;
+                }
+            }
+
+            // Draw labels and leader lines
+            c.save();
+            smallLabels.forEach(label => {
+                // Leader line: edge → elbow → horizontal
                 c.beginPath();
-                c.moveTo(edgeX, edgeY);
-                c.lineTo(outX, outY);
-                c.strokeStyle = 'rgba(255,255,255,0.4)';
+                c.moveTo(label.edgeX, label.edgeY);
+                c.lineTo(label.elbowX, label.elbowY);
+                c.lineTo(label.endX, label.y);
+                c.strokeStyle = 'rgba(255,255,255,0.5)';
                 c.lineWidth = 1;
                 c.stroke();
+
+                // Label text
+                c.fillStyle = '#e0e0f0';
+                c.font = 'bold 10px Inter, sans-serif';
+                c.textAlign = label.isRight ? 'left' : 'right';
+                c.textBaseline = 'middle';
+                c.fillText(label.text, label.endX + (label.isRight ? 4 : -4), label.y);
             });
             c.restore();
         }
@@ -971,7 +1006,7 @@ function renderDefectsChart() {
             responsive: true,
             maintainAspectRatio: false,
             layout: {
-                padding: { top: 30, bottom: 30, left: 30, right: 30 }
+                padding: { top: 40, bottom: 40, left: 50, right: 50 }
             },
             plugins: {
                 legend: {
@@ -980,39 +1015,24 @@ function renderDefectsChart() {
                 },
                 datalabels: {
                     color: '#ffffff',
-                    font: function (ctx) {
-                        const value = ctx.dataset.data[ctx.dataIndex];
-                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
-                        return { size: pct < 8 ? 10 : 11, weight: 'bold', family: 'Inter' };
-                    },
-                    anchor: function (ctx) {
-                        const value = ctx.dataset.data[ctx.dataIndex];
-                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
-                        return pct < 8 ? 'end' : 'center';
-                    },
-                    align: function (ctx) {
-                        const value = ctx.dataset.data[ctx.dataIndex];
-                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
-                        return pct < 8 ? 'end' : 'center';
-                    },
-                    offset: function (ctx) {
-                        const value = ctx.dataset.data[ctx.dataIndex];
-                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
-                        return pct < 8 ? 18 : 0;
-                    },
+                    font: { size: 11, weight: 'bold', family: 'Inter' },
+                    anchor: 'center',
+                    align: 'center',
                     formatter: function (value) {
                         if (value === 0) return '';
-                        const pct = totalDefects > 0 ? ((value / totalDefects) * 100).toFixed(1) : 0;
-                        return value + ' (' + pct + '%)';
+                        const pct = totalDefects > 0 ? ((value / totalDefects) * 100) : 0;
+                        if (pct < 8) return ''; // Small segments handled by custom plugin
+                        return value + ' (' + pct.toFixed(1) + '%)';
                     },
-                    textAlign: 'center',
                     display: function (ctx) {
-                        return ctx.dataset.data[ctx.dataIndex] > 0;
+                        const value = ctx.dataset.data[ctx.dataIndex];
+                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
+                        return value > 0 && pct >= 8;
                     }
                 }
             }
         },
-        plugins: [ChartDataLabels, doughnutLabelLines]
+        plugins: [ChartDataLabels, doughnutOuterLabels]
     });
 }
 
