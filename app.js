@@ -332,6 +332,30 @@ function getYearKey(dateStr) {
     return `${d.getFullYear()}`;
 }
 
+function getWeekKey(dateStr) {
+    const d = parseDate(dateStr);
+    if (!d) return dateStr;
+    // Get Monday of the week
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d);
+    monday.setDate(diff);
+    return monday.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getDateRangeLabel(data) {
+    if (data.length === 0) return '';
+    const dates = data.map(r => parseDate(r.date)).filter(d => d);
+    if (dates.length === 0) return '';
+    const minDate = new Date(Math.min(...dates));
+    const maxDate = new Date(Math.max(...dates));
+    const opts = { day: '2-digit', month: 'short', year: 'numeric' };
+    if (minDate.toDateString() === maxDate.toDateString()) {
+        return minDate.toLocaleDateString('en-IN', opts);
+    }
+    return `${minDate.toLocaleDateString('en-IN', opts)} – ${maxDate.toLocaleDateString('en-IN', opts)}`;
+}
+
 // ============ FILTER LOGIC ============
 function applyFilters() {
     const dateFrom = document.getElementById('filterDateFrom')?.value;
@@ -407,7 +431,12 @@ function renderKPIs() {
     document.getElementById('kpiAcceptRate').textContent = acceptPct + '%';
     document.getElementById('kpiRejectRate').textContent = rejectPct + '%';
     document.getElementById('kpiTotalWeight').textContent = totalWt.toLocaleString('en-IN', { maximumFractionDigits: 1 }) + ' Kg';
-    document.getElementById('kpiSubPipes').textContent = `${totalAccepted.toLocaleString('en-IN')} accepted / ${totalRejected.toLocaleString('en-IN')} rejected`;
+
+    // Show date range context
+    const rangeLabel = getDateRangeLabel(data);
+    const uniqueDays = new Set(data.map(r => r.date)).size;
+    document.getElementById('kpiSubPipes').textContent = `${totalAccepted.toLocaleString('en-IN')} accepted / ${totalRejected.toLocaleString('en-IN')} rejected`
+        + (rangeLabel ? ` · ${uniqueDays} day${uniqueDays !== 1 ? 's' : ''} (${rangeLabel})` : '');
 }
 
 // ============ PRODUCTION REPORT TABLE ============
@@ -801,25 +830,58 @@ function renderCharts() {
 function renderAcceptRejectChart() {
     const data = filteredData;
 
-    // Aggregate by date
-    const dateGroups = {};
+    // Determine date span to pick aggregation level
+    const allDates = data.map(r => parseDate(r.date)).filter(d => d);
+    let spanDays = 0;
+    if (allDates.length > 1) {
+        const minD = Math.min(...allDates);
+        const maxD = Math.max(...allDates);
+        spanDays = Math.round((maxD - minD) / (1000 * 60 * 60 * 24));
+    }
+
+    // Choose aggregation: daily (≤14), weekly (15-90), monthly (>90)
+    let aggMode = 'Daily';
+    let keyFn = (row) => row.date;
+    let labelFn = (key) => formatDate(key);
+
+    if (spanDays > 90) {
+        aggMode = 'Monthly';
+        keyFn = (row) => getMonthKey(row.date);
+        labelFn = (key) => key;
+    } else if (spanDays > 14) {
+        aggMode = 'Weekly';
+        keyFn = (row) => getWeekKey(row.date);
+        labelFn = (key) => 'Wk ' + key;
+    }
+
+    // Update chart title
+    const titleEl = document.getElementById('chartAccRejTitle');
+    if (titleEl) titleEl.textContent = `📊 Accepted vs Rejected (${aggMode})`;
+
+    // Aggregate by chosen key
+    const groups = {};
+    const groupOrder = [];
     data.forEach(row => {
-        if (!dateGroups[row.date]) {
-            dateGroups[row.date] = { accepted: 0, rejected: 0 };
+        const key = keyFn(row);
+        if (!groups[key]) {
+            groups[key] = { accepted: 0, rejected: 0, sortDate: parseDate(row.date) };
+            groupOrder.push(key);
         }
-        dateGroups[row.date].accepted += row.accepted;
-        dateGroups[row.date].rejected += row.rejected;
+        groups[key].accepted += row.accepted;
+        groups[key].rejected += row.rejected;
+        // Keep earliest date for sorting
+        const rd = parseDate(row.date);
+        if (rd && (!groups[key].sortDate || rd < groups[key].sortDate)) {
+            groups[key].sortDate = rd;
+        }
     });
 
-    const sortedDates = Object.keys(dateGroups).sort((a, b) => {
-        const da = parseDate(a);
-        const db = parseDate(b);
-        return (da || 0) - (db || 0);
-    });
+    // Sort by earliest date in each group
+    groupOrder.sort((a, b) => (groups[a].sortDate || 0) - (groups[b].sortDate || 0));
 
-    const labels = sortedDates.map(d => formatDate(d));
-    const acceptedVals = sortedDates.map(d => dateGroups[d].accepted);
-    const rejectedVals = sortedDates.map(d => dateGroups[d].rejected);
+    const labels = groupOrder.map(k => labelFn(k));
+    const acceptedVals = groupOrder.map(k => groups[k].accepted);
+    const rejectedVals = groupOrder.map(k => groups[k].rejected);
 
     const ctx = document.getElementById('chartAccRej');
     if (!ctx) return;
@@ -1420,8 +1482,10 @@ async function initApp() {
         ]);
 
         allData = transformReportData(rawData);
-        filteredData = [...allData];
         pipeMasterData = rawPipeMaster || [];
+
+        // Set default date filter: last 7 days for dashboard
+        setDefaultDateRange();
 
         // Run error checks
         dataQualityFlags = runErrorChecks(allData, pipeMasterData);
@@ -1429,8 +1493,8 @@ async function initApp() {
         // Populate filter dropdowns
         populateFilterOptions();
 
-        // Render everything
-        renderAll();
+        // Apply filters (will use default date range)
+        applyFilters();
         renderDataQuality();
 
         const flagCount = dataQualityFlags.length;
@@ -1445,6 +1509,29 @@ async function initApp() {
     }
 
     showLoading(false);
+}
+
+// Set default date range to last 7 days
+function setDefaultDateRange() {
+    const dateFromEl = document.getElementById('filterDateFrom');
+    const dateToEl = document.getElementById('filterDateTo');
+    if (!dateFromEl || !dateToEl) return;
+
+    // Only set defaults if user hasn't manually set filters
+    if (dateFromEl.value || dateToEl.value) return;
+
+    // Find the latest date in data
+    const allDates = allData.map(r => parseDate(r.date)).filter(d => d);
+    if (allDates.length === 0) return;
+
+    const maxDate = new Date(Math.max(...allDates));
+    const fromDate = new Date(maxDate);
+    fromDate.setDate(fromDate.getDate() - 6); // 7 days including maxDate
+
+    // Format as yyyy-mm-dd for date input
+    const fmt = (d) => d.toISOString().slice(0, 10);
+    dateFromEl.value = fmt(fromDate);
+    dateToEl.value = fmt(maxDate);
 }
 
 function showLoading(show) {
