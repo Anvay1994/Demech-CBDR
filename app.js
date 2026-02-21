@@ -916,6 +916,40 @@ function renderDefectsChart() {
 
     if (chartDefects) chartDefects.destroy();
 
+    // Custom plugin to draw connector lines for outside labels
+    const doughnutLabelLines = {
+        id: 'doughnutLabelLines',
+        afterDatasetsDraw(chart) {
+            const { ctx: c } = chart;
+            const dataset = chart.data.datasets[0];
+            const meta = chart.getDatasetMeta(0);
+            const total = dataset.data.reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+
+            c.save();
+            meta.data.forEach((arc, i) => {
+                const value = dataset.data[i];
+                const pct = (value / total) * 100;
+                if (pct >= 8 || value === 0) return; // Only for small segments
+
+                const { x, y, startAngle, endAngle, innerRadius, outerRadius } = arc.getProps(['x', 'y', 'startAngle', 'endAngle', 'innerRadius', 'outerRadius']);
+                const midAngle = (startAngle + endAngle) / 2;
+                const edgeX = x + Math.cos(midAngle) * outerRadius;
+                const edgeY = y + Math.sin(midAngle) * outerRadius;
+                const outX = x + Math.cos(midAngle) * (outerRadius + 20);
+                const outY = y + Math.sin(midAngle) * (outerRadius + 20);
+
+                c.beginPath();
+                c.moveTo(edgeX, edgeY);
+                c.lineTo(outX, outY);
+                c.strokeStyle = 'rgba(255,255,255,0.4)';
+                c.lineWidth = 1;
+                c.stroke();
+            });
+            c.restore();
+        }
+    };
+
     chartDefects = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -936,6 +970,9 @@ function renderDefectsChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: { top: 30, bottom: 30, left: 30, right: 30 }
+            },
             plugins: {
                 legend: {
                     position: 'right',
@@ -943,11 +980,30 @@ function renderDefectsChart() {
                 },
                 datalabels: {
                     color: '#ffffff',
-                    font: { size: 11, weight: 'bold', family: 'Inter' },
+                    font: function (ctx) {
+                        const value = ctx.dataset.data[ctx.dataIndex];
+                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
+                        return { size: pct < 8 ? 10 : 11, weight: 'bold', family: 'Inter' };
+                    },
+                    anchor: function (ctx) {
+                        const value = ctx.dataset.data[ctx.dataIndex];
+                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
+                        return pct < 8 ? 'end' : 'center';
+                    },
+                    align: function (ctx) {
+                        const value = ctx.dataset.data[ctx.dataIndex];
+                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
+                        return pct < 8 ? 'end' : 'center';
+                    },
+                    offset: function (ctx) {
+                        const value = ctx.dataset.data[ctx.dataIndex];
+                        const pct = totalDefects > 0 ? (value / totalDefects) * 100 : 0;
+                        return pct < 8 ? 18 : 0;
+                    },
                     formatter: function (value) {
                         if (value === 0) return '';
                         const pct = totalDefects > 0 ? ((value / totalDefects) * 100).toFixed(1) : 0;
-                        return value + '\n(' + pct + '%)';
+                        return value + ' (' + pct + '%)';
                     },
                     textAlign: 'center',
                     display: function (ctx) {
@@ -956,7 +1012,7 @@ function renderDefectsChart() {
                 }
             }
         },
-        plugins: [ChartDataLabels]
+        plugins: [ChartDataLabels, doughnutLabelLines]
     });
 }
 
