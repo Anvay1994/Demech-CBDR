@@ -1411,6 +1411,13 @@ function switchTab(tabName) {
 }
 
 // ============ EXPORT CSV ============
+function csvSafe(val) {
+    if (val === undefined || val === null) return '""';
+    let str = String(val);
+    // Escape quotes and wrap in quotes
+    return `"${str.replace(/"/g, '""')}"`;
+}
+
 function exportCSV(reportType) {
     const data = filteredData;
     let csvContent = '';
@@ -1428,7 +1435,22 @@ function exportCSV(reportType) {
         let srNo = 1;
         Object.values(groups).forEach(group => {
             group.pipes.forEach((pipe, idx) => {
-                csvContent += `${idx === 0 ? srNo : ''},${idx === 0 ? group.date : ''},${idx === 0 ? group.shift : ''},${idx === 0 ? group.supervisor : ''},${idx === 0 ? group.qcName : ''},${pipe.pipeSize},${pipe.totalPipes},${pipe.accepted},${pipe.rejected},${pipe.totalWt.toFixed(1)},${pipe.acceptedWt.toFixed(1)},${pipe.rejectedWt.toFixed(1)},${pipe.rejectedPct}\n`;
+                const rowArr = [
+                    idx === 0 ? srNo : '',
+                    idx === 0 ? group.date : '',
+                    idx === 0 ? group.shift : '',
+                    idx === 0 ? group.supervisor : '',
+                    idx === 0 ? group.qcName : '',
+                    pipe.pipeSize,
+                    pipe.totalPipes,
+                    pipe.accepted,
+                    pipe.rejected,
+                    pipe.totalWt.toFixed(1),
+                    pipe.acceptedWt.toFixed(1),
+                    pipe.rejectedWt.toFixed(1),
+                    pipe.rejectedPct
+                ];
+                csvContent += rowArr.map(csvSafe).join(',') + '\n';
             });
             srNo++;
         });
@@ -1437,12 +1459,28 @@ function exportCSV(reportType) {
 
         let srNo = 1;
         data.forEach(row => {
-            csvContent += `${srNo},${row.date},${row.shift},${row.qcName || '—'},${row.supervisor},${row.pipeSize},${row.totalPipes},${row.accepted},${row.rejected},${row.totalWt.toFixed(1)},${row.acceptedWt.toFixed(1)},${row.rejectedWt.toFixed(1)},${row.rejectedPct}\n`;
+            const rowArr = [
+                srNo,
+                row.date,
+                row.shift,
+                row.qcName || '—',
+                row.supervisor,
+                row.pipeSize,
+                row.totalPipes,
+                row.accepted,
+                row.rejected,
+                row.totalWt.toFixed(1),
+                row.acceptedWt.toFixed(1),
+                row.rejectedWt.toFixed(1),
+                row.rejectedPct
+            ];
+            csvContent += rowArr.map(csvSafe).join(',') + '\n';
             srNo++;
         });
     }
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    // Add Byte Order Mark (BOM) so Excel handles UTF-8 (and our symbols) correctly
+    const blob = new Blob(['\ufeff', csvContent], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
