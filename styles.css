@@ -861,20 +861,17 @@ body::before {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* Animated gradient top accent bar */
+/* Subtle static top accent bar */
 .chart-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  background: linear-gradient(90deg,
-      #4361ee 0%, #7b61ff 30%, #2ec4b6 55%, #f4a261 80%, #e63946 100%);
-  background-size: 200% 100%;
-  animation: chartAccentMove 6s linear infinite;
+  height: 2px;
+  background: #4361ee;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  opacity: 0.85;
+  opacity: 0.6;
 }
 
 /* Subtle inner corner glow */
@@ -890,15 +887,7 @@ body::before {
   pointer-events: none;
 }
 
-@keyframes chartAccentMove {
-  0% {
-    background-position: 0% 0%;
-  }
 
-  100% {
-    background-position: 200% 0%;
-  }
-}
 
 .chart-card:hover {
   transform: translateY(-4px);
