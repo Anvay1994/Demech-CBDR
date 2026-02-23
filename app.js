@@ -1001,6 +1001,15 @@ function renderAcceptRejectChart() {
                                 return `  ${item.dataset.label}: ${item.formattedValue}%`;
                             }
                             return `  ${item.dataset.label}: ${item.formattedValue}`;
+                        },
+                        footer: (items) => {
+                            let total = 0;
+                            items.forEach(item => {
+                                if (item.dataset.label === 'Accepted' || item.dataset.label === 'Rejected') {
+                                    total += item.raw;
+                                }
+                            });
+                            return `Total Produced: ${total}`;
                         }
                     }
                 },
@@ -1328,6 +1337,15 @@ function renderSupervisorChart() {
                                 return `  ${item.dataset.label}: ${item.formattedValue}%`;
                             }
                             return `  ${item.dataset.label}: ${item.formattedValue}`;
+                        },
+                        footer: (items) => {
+                            let total = 0;
+                            items.forEach(item => {
+                                if (item.dataset.label === 'Accepted' || item.dataset.label === 'Rejected') {
+                                    total += item.raw;
+                                }
+                            });
+                            return `Total Produced: ${total}`;
                         }
                     }
                 },
