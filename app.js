@@ -838,10 +838,36 @@ function renderCharts() {
     renderSupervisorChart();
 }
 
+// ========= CHART UTILITIES =========
+// Build a vertical linear gradient for a canvas context
+function makeGradient(ctx, chartArea, colorTop, colorBottom) {
+    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    gradient.addColorStop(0, colorTop);
+    gradient.addColorStop(1, colorBottom);
+    return gradient;
+}
+
+// Shared beautiful tooltip config (glassmorphism dark)
+const CHART_TOOLTIP = {
+    enabled: true,
+    backgroundColor: 'rgba(10, 10, 30, 0.92)',
+    titleColor: '#e8e8f0',
+    bodyColor: '#a0a0c8',
+    borderColor: 'rgba(67, 97, 238, 0.4)',
+    borderWidth: 1,
+    padding: 12,
+    cornerRadius: 10,
+    titleFont: { family: 'Outfit', size: 12, weight: '700' },
+    bodyFont: { family: 'Inter', size: 11 },
+    boxPadding: 6,
+    usePointStyle: true,
+    caretSize: 6,
+    callbacks: {}
+};
+
 function renderAcceptRejectChart() {
     const data = filteredData;
 
-    // Determine date span to pick aggregation level
     const allDates = data.map(r => parseDate(r.date)).filter(d => d);
     let spanDays = 0;
     if (allDates.length > 1) {
@@ -850,11 +876,9 @@ function renderAcceptRejectChart() {
         spanDays = Math.round((maxD - minD) / (1000 * 60 * 60 * 24));
     }
 
-    // Choose aggregation: daily (≤14), weekly (15-90), monthly (>90)
     let aggMode = 'Daily';
     let keyFn = (row) => row.date;
     let labelFn = (key) => formatDate(key);
-
     if (spanDays > 90) {
         aggMode = 'Monthly';
         keyFn = (row) => getMonthKey(row.date);
@@ -865,11 +889,9 @@ function renderAcceptRejectChart() {
         labelFn = (key) => 'Wk ' + key;
     }
 
-    // Update chart title
     const titleEl = document.getElementById('chartAccRejTitle');
     if (titleEl) titleEl.textContent = `📊 Accepted vs Rejected (${aggMode})`;
 
-    // Aggregate by chosen key
     const groups = {};
     const groupOrder = [];
     data.forEach(row => {
@@ -880,94 +902,153 @@ function renderAcceptRejectChart() {
         }
         groups[key].accepted += row.accepted;
         groups[key].rejected += row.rejected;
-        // Keep earliest date for sorting
         const rd = parseDate(row.date);
         if (rd && (!groups[key].sortDate || rd < groups[key].sortDate)) {
             groups[key].sortDate = rd;
         }
     });
-
-    // Sort by earliest date in each group
     groupOrder.sort((a, b) => (groups[a].sortDate || 0) - (groups[b].sortDate || 0));
 
     const labels = groupOrder.map(k => labelFn(k));
     const acceptedVals = groupOrder.map(k => groups[k].accepted);
     const rejectedVals = groupOrder.map(k => groups[k].rejected);
+    const rejPctVals = groupOrder.map(k => {
+        const total = groups[k].accepted + groups[k].rejected;
+        return total > 0 ? parseFloat(((groups[k].rejected / total) * 100).toFixed(1)) : 0;
+    });
 
     const ctx = document.getElementById('chartAccRej');
     if (!ctx) return;
-
     if (chartAccRej) chartAccRej.destroy();
 
-    // Custom plugin to draw total + rejected % on top of stacked bar
-    const stackedTopLabels = {
-        id: 'stackedTopLabels1',
-        afterDatasetsDraw(chart) {
-            const { ctx: c, scales } = chart;
-            const meta0 = chart.getDatasetMeta(0); // Accepted
-            const meta1 = chart.getDatasetMeta(1); // Rejected
-            c.save();
-            meta1.data.forEach((bar, i) => {
-                const acc = acceptedVals[i] || 0;
-                const rej = rejectedVals[i] || 0;
-                const total = acc + rej;
-                const rejPct = total > 0 ? ((rej / total) * 100).toFixed(1) : '0.0';
-                c.fillStyle = '#e0e0f0';
-                c.font = 'bold 11px Inter';
-                c.textAlign = 'center';
-                c.fillText(`Total: ${total}`, bar.x, bar.y - 16);
-                c.fillStyle = '#ff6b7a';
-                c.font = 'bold 10px Inter';
-                c.fillText(`Rej: ${rejPct}%`, bar.x, bar.y - 4);
-            });
-            c.restore();
-        }
+    // Gradient fill function (runs after each render)
+    const getAcceptedGradient = (context) => {
+        const chart = context.chart;
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return 'rgba(46,196,182,0.75)';
+        return makeGradient(c, chartArea, 'rgba(46,196,182,0.92)', 'rgba(32,180,150,0.45)');
+    };
+    const getRejectedGradient = (context) => {
+        const chart = context.chart;
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return 'rgba(230,57,70,0.8)';
+        return makeGradient(c, chartArea, 'rgba(255,80,95,0.95)', 'rgba(200,30,50,0.50)');
     };
 
     chartAccRej = new Chart(ctx, {
-        type: 'bar',
         data: {
             labels,
             datasets: [
                 {
+                    type: 'bar',
                     label: 'Accepted',
                     data: acceptedVals,
-                    backgroundColor: 'rgba(46, 196, 182, 0.75)',
-                    borderColor: '#2ec4b6',
-                    borderWidth: 0,
-                    borderRadius: { topLeft: 0, topRight: 0 },
+                    backgroundColor: getAcceptedGradient,
+                    borderColor: 'rgba(46,196,182,0.9)',
+                    borderWidth: { top: 2, left: 0, right: 0, bottom: 0 },
+                    borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 5, bottomRight: 5 },
+                    borderSkipped: false,
+                    stack: 'stack',
+                    order: 2,
+                    maxBarThickness: 56,
                 },
                 {
+                    type: 'bar',
                     label: 'Rejected',
                     data: rejectedVals,
-                    backgroundColor: 'rgba(230, 57, 70, 0.8)',
-                    borderColor: '#e63946',
-                    borderWidth: 0,
-                    borderRadius: { topLeft: 4, topRight: 4 },
+                    backgroundColor: getRejectedGradient,
+                    borderColor: 'rgba(255,80,95,0.9)',
+                    borderWidth: { top: 2, left: 0, right: 0, bottom: 0 },
+                    borderRadius: { topLeft: 5, topRight: 5, bottomLeft: 0, bottomRight: 0 },
+                    borderSkipped: false,
+                    stack: 'stack',
+                    order: 2,
+                    maxBarThickness: 56,
+                },
+                {
+                    type: 'line',
+                    label: 'Rejection %',
+                    data: rejPctVals,
+                    yAxisID: 'yPct',
+                    borderColor: 'rgba(244,162,97,1)',
+                    backgroundColor: 'rgba(244,162,97,0.12)',
+                    borderWidth: 2.5,
+                    pointBackgroundColor: 'rgba(244,162,97,1)',
+                    pointBorderColor: '#0a0a1a',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    tension: 0.38,
+                    fill: true,
+                    order: 1,
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 900,
+                easing: 'easeOutQuart'
+            },
+            interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } },
+                tooltip: {
+                    ...CHART_TOOLTIP,
+                    callbacks: {
+                        label: (item) => {
+                            if (item.dataset.label === 'Rejection %') {
+                                return `  ${item.dataset.label}: ${item.formattedValue}%`;
+                            }
+                            return `  ${item.dataset.label}: ${item.formattedValue}`;
+                        }
+                    }
+                },
+                legend: {
+                    labels: {
+                        color: '#9090b8',
+                        font: { family: 'Inter', size: 11 },
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded',
+                        padding: 16
+                    }
+                },
                 datalabels: {
                     color: '#ffffff',
                     font: { size: 10, weight: 'bold', family: 'Inter' },
                     anchor: 'center',
                     align: 'center',
                     display: function (ctx) {
+                        if (ctx.datasetIndex === 2) return false; // hide on line
                         return ctx.dataset.data[ctx.dataIndex] > 0;
                     }
                 }
             },
             scales: {
-                x: { stacked: true, ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                y: { stacked: true, ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                x: {
+                    stacked: true,
+                    ticks: { color: '#6868a0', font: { size: 10, family: 'Inter' } },
+                    grid: { color: 'rgba(255,255,255,0.03)', drawTicks: false },
+                    border: { color: 'rgba(255,255,255,0.05)' }
+                },
+                y: {
+                    stacked: true,
+                    ticks: { color: '#6868a0', font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.05)', borderDash: [4, 4] },
+                    border: { dash: [4, 4], color: 'rgba(255,255,255,0.05)' }
+                },
+                yPct: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 0,
+                    max: 100,
+                    ticks: { color: 'rgba(244,162,97,0.8)', font: { size: 10 }, callback: v => v + '%' },
+                    grid: { drawOnChartArea: false },
+                    border: { color: 'rgba(244,162,97,0.2)' }
+                }
             }
         },
-        plugins: [ChartDataLabels, stackedTopLabels]
+        plugins: [ChartDataLabels]
     });
 }
 
@@ -986,10 +1067,18 @@ function renderDefectsChart() {
 
     const ctx = document.getElementById('chartDefects');
     if (!ctx) return;
-
     if (chartDefects) chartDefects.destroy();
 
-    // Custom plugin: draw labels for small segments outside with collision-free leader lines
+    // Rich gradient-influenced palette for doughnut segments
+    const DEFECT_COLORS = [
+        { bg: 'rgba(67,97,238,0.88)', border: '#4361ee', glow: 'rgba(67,97,238,0.5)' },
+        { bg: 'rgba(255,80,95,0.88)', border: '#ff505f', glow: 'rgba(255,80,95,0.5)' },
+        { bg: 'rgba(244,162,97,0.88)', border: '#f4a261', glow: 'rgba(244,162,97,0.5)' },
+        { bg: 'rgba(123,97,255,0.88)', border: '#7b61ff', glow: 'rgba(123,97,255,0.5)' },
+        { bg: 'rgba(46,196,182,0.88)', border: '#2ec4b6', glow: 'rgba(46,196,182,0.5)' },
+    ];
+
+    // Custom plugin: outer labels with leader lines for small segments
     const doughnutOuterLabels = {
         id: 'doughnutOuterLabels',
         afterDatasetsDraw(chart) {
@@ -999,7 +1088,6 @@ function renderDefectsChart() {
             const total = dataset.data.reduce((a, b) => a + b, 0);
             if (total === 0) return;
 
-            // Collect small-segment label info
             const smallLabels = [];
             meta.data.forEach((arc, i) => {
                 const value = dataset.data[i];
@@ -1017,43 +1105,58 @@ function renderDefectsChart() {
 
                 smallLabels.push({
                     text: `${value} (${pct.toFixed(1)}%)`,
+                    color: DEFECT_COLORS[i]?.border || '#e0e0f0',
                     edgeX, edgeY, elbowX, elbowY, endX,
-                    naturalY: elbowY,
-                    y: elbowY,
-                    isRight
+                    naturalY: elbowY, y: elbowY, isRight
                 });
             });
 
-            // Sort by natural Y position and spread overlapping labels
             smallLabels.sort((a, b) => a.naturalY - b.naturalY);
             const minGap = 18;
             for (let i = 1; i < smallLabels.length; i++) {
-                const prev = smallLabels[i - 1];
-                const curr = smallLabels[i];
-                if (curr.y - prev.y < minGap) {
-                    curr.y = prev.y + minGap;
+                if (smallLabels[i].y - smallLabels[i - 1].y < minGap) {
+                    smallLabels[i].y = smallLabels[i - 1].y + minGap;
                 }
             }
 
-            // Draw labels and leader lines
             c.save();
             smallLabels.forEach(label => {
-                // Leader line: edge → elbow → horizontal
                 c.beginPath();
                 c.moveTo(label.edgeX, label.edgeY);
                 c.lineTo(label.elbowX, label.elbowY);
                 c.lineTo(label.endX, label.y);
-                c.strokeStyle = 'rgba(255,255,255,0.5)';
-                c.lineWidth = 1;
+                c.strokeStyle = label.color + '99';
+                c.lineWidth = 1.5;
                 c.stroke();
 
-                // Label text
-                c.fillStyle = '#e0e0f0';
+                c.fillStyle = label.color;
                 c.font = 'bold 10px Inter, sans-serif';
                 c.textAlign = label.isRight ? 'left' : 'right';
                 c.textBaseline = 'middle';
                 c.fillText(label.text, label.endX + (label.isRight ? 4 : -4), label.y);
             });
+            c.restore();
+        }
+    };
+
+    // Centre text plugin showing total defects
+    const centreText = {
+        id: 'centreText',
+        beforeDatasetsDraw(chart) {
+            const { ctx: c, data: d } = chart;
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data[0]) return;
+            const cx = meta.data[0].x;
+            const cy = meta.data[0].y;
+            c.save();
+            c.textAlign = 'center';
+            c.textBaseline = 'middle';
+            c.fillStyle = '#7070a0';
+            c.font = '11px Inter';
+            c.fillText('Total Defects', cx, cy - 12);
+            c.fillStyle = '#e8e8f0';
+            c.font = 'bold 22px Outfit';
+            c.fillText(totalDefects.toLocaleString('en-IN'), cx, cy + 10);
             c.restore();
         }
     };
@@ -1064,38 +1167,54 @@ function renderDefectsChart() {
             labels: Object.keys(totals),
             datasets: [{
                 data: Object.values(totals),
-                backgroundColor: [
-                    'rgba(67, 97, 238, 0.8)',
-                    'rgba(230, 57, 70, 0.8)',
-                    'rgba(244, 162, 97, 0.8)',
-                    'rgba(123, 97, 255, 0.8)',
-                    'rgba(46, 196, 182, 0.8)'
-                ],
-                borderColor: '#0a0a1a',
+                backgroundColor: DEFECT_COLORS.map(c => c.bg),
+                borderColor: DEFECT_COLORS.map(c => c.border),
+                hoverBorderColor: DEFECT_COLORS.map(c => c.border),
                 borderWidth: 2,
+                hoverOffset: 14,
+                hoverBorderWidth: 3,
+                spacing: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: {
-                padding: { top: 40, bottom: 40, left: 50, right: 50 }
-            },
+            cutout: '62%',
+            animation: { animateRotate: true, animateScale: true, duration: 1000, easing: 'easeOutBack' },
+            layout: { padding: { top: 44, bottom: 44, left: 55, right: 55 } },
             plugins: {
+                tooltip: {
+                    ...CHART_TOOLTIP,
+                    callbacks: {
+                        label: (item) => {
+                            const v = item.raw;
+                            const pct = totalDefects > 0 ? ((v / totalDefects) * 100).toFixed(1) : '0.0';
+                            return `  ${item.label}: ${v.toLocaleString('en-IN')} (${pct}%)`;
+                        }
+                    }
+                },
                 legend: {
                     position: 'right',
-                    labels: { color: '#8888a8', font: { family: 'Inter', size: 11 }, padding: 12 }
+                    labels: {
+                        color: '#9090b8',
+                        font: { family: 'Inter', size: 11 },
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 14
+                    }
                 },
                 datalabels: {
                     color: '#ffffff',
                     font: { size: 11, weight: 'bold', family: 'Inter' },
                     anchor: 'center',
                     align: 'center',
+                    textShadowColor: 'rgba(0,0,0,0.6)',
+                    textShadowBlur: 4,
                     formatter: function (value) {
                         if (value === 0) return '';
                         const pct = totalDefects > 0 ? ((value / totalDefects) * 100) : 0;
-                        if (pct < 8) return ''; // Small segments handled by custom plugin
-                        return value + ' (' + pct.toFixed(1) + '%)';
+                        if (pct < 8) return '';
+                        return value + '\n(' + pct.toFixed(1) + '%)';
                     },
                     display: function (ctx) {
                         const value = ctx.dataset.data[ctx.dataIndex];
@@ -1105,7 +1224,7 @@ function renderDefectsChart() {
                 }
             }
         },
-        plugins: [ChartDataLabels, doughnutOuterLabels]
+        plugins: [ChartDataLabels, doughnutOuterLabels, centreText]
     });
 }
 
@@ -1124,78 +1243,139 @@ function renderSupervisorChart() {
     const labels = Object.keys(supGroups);
     const acceptedVals = labels.map(s => supGroups[s].accepted);
     const rejectedVals = labels.map(s => supGroups[s].rejected);
+    const rejPctVals = labels.map(s => {
+        const total = supGroups[s].accepted + supGroups[s].rejected;
+        return total > 0 ? parseFloat(((supGroups[s].rejected / total) * 100).toFixed(1)) : 0;
+    });
 
     const ctx = document.getElementById('chartSupervisor');
     if (!ctx) return;
-
     if (chartSupervisor) chartSupervisor.destroy();
 
-    // Custom plugin to draw total + rejected % on top of stacked bar
-    const stackedTopLabels = {
-        id: 'stackedTopLabels2',
-        afterDatasetsDraw(chart) {
-            const { ctx: c } = chart;
-            const meta1 = chart.getDatasetMeta(1); // Rejected (top)
-            c.save();
-            meta1.data.forEach((bar, i) => {
-                const acc = acceptedVals[i] || 0;
-                const rej = rejectedVals[i] || 0;
-                const total = acc + rej;
-                const rejPct = total > 0 ? ((rej / total) * 100).toFixed(1) : '0.0';
-                c.fillStyle = '#e0e0f0';
-                c.font = 'bold 11px Inter';
-                c.textAlign = 'center';
-                c.fillText(`Total: ${total}`, bar.x, bar.y - 16);
-                c.fillStyle = '#ff6b7a';
-                c.font = 'bold 10px Inter';
-                c.fillText(`Rej: ${rejPct}%`, bar.x, bar.y - 4);
-            });
-            c.restore();
-        }
+    const getAccGradient = (context) => {
+        const chart = context.chart;
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return 'rgba(46,196,182,0.75)';
+        return makeGradient(c, chartArea, 'rgba(46,196,182,0.92)', 'rgba(32,180,150,0.40)');
+    };
+    const getRejGradient = (context) => {
+        const chart = context.chart;
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return 'rgba(230,57,70,0.8)';
+        return makeGradient(c, chartArea, 'rgba(255,80,95,0.95)', 'rgba(200,30,50,0.45)');
     };
 
     chartSupervisor = new Chart(ctx, {
-        type: 'bar',
         data: {
             labels,
             datasets: [
                 {
+                    type: 'bar',
                     label: 'Accepted',
                     data: acceptedVals,
-                    backgroundColor: 'rgba(46, 196, 182, 0.75)',
-                    borderWidth: 0,
-                    borderRadius: { topLeft: 0, topRight: 0 },
+                    backgroundColor: getAccGradient,
+                    borderColor: 'rgba(46,196,182,0.9)',
+                    borderWidth: { top: 2, left: 0, right: 0, bottom: 0 },
+                    borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 },
+                    borderSkipped: false,
+                    stack: 'stack',
+                    order: 2,
+                    maxBarThickness: 64,
                 },
                 {
+                    type: 'bar',
                     label: 'Rejected',
                     data: rejectedVals,
-                    backgroundColor: 'rgba(230, 57, 70, 0.8)',
-                    borderWidth: 0,
-                    borderRadius: { topLeft: 4, topRight: 4 },
+                    backgroundColor: getRejGradient,
+                    borderColor: 'rgba(255,80,95,0.9)',
+                    borderWidth: { top: 2, left: 0, right: 0, bottom: 0 },
+                    borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+                    borderSkipped: false,
+                    stack: 'stack',
+                    order: 2,
+                    maxBarThickness: 64,
+                },
+                {
+                    type: 'line',
+                    label: 'Rejection %',
+                    data: rejPctVals,
+                    yAxisID: 'yPct',
+                    borderColor: 'rgba(244,162,97,1)',
+                    backgroundColor: 'rgba(244,162,97,0.1)',
+                    borderWidth: 2.5,
+                    pointBackgroundColor: 'rgba(244,162,97,1)',
+                    pointBorderColor: '#0a0a1a',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 9,
+                    tension: 0.3,
+                    fill: true,
+                    order: 1,
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: { duration: 900, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { labels: { color: '#8888a8', font: { family: 'Inter' } } },
+                tooltip: {
+                    ...CHART_TOOLTIP,
+                    callbacks: {
+                        label: (item) => {
+                            if (item.dataset.label === 'Rejection %') {
+                                return `  ${item.dataset.label}: ${item.formattedValue}%`;
+                            }
+                            return `  ${item.dataset.label}: ${item.formattedValue}`;
+                        }
+                    }
+                },
+                legend: {
+                    labels: {
+                        color: '#9090b8',
+                        font: { family: 'Inter', size: 11 },
+                        usePointStyle: true,
+                        pointStyle: 'rectRounded',
+                        padding: 16
+                    }
+                },
                 datalabels: {
                     color: '#ffffff',
                     font: { size: 10, weight: 'bold', family: 'Inter' },
                     anchor: 'center',
                     align: 'center',
                     display: function (ctx) {
+                        if (ctx.datasetIndex === 2) return false;
                         return ctx.dataset.data[ctx.dataIndex] > 0;
                     }
                 }
             },
             scales: {
-                x: { stacked: true, ticks: { color: '#8888a8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                y: { stacked: true, ticks: { color: '#5a5a7a' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                x: {
+                    stacked: true,
+                    ticks: { color: '#6868a0', font: { size: 11, family: 'Inter' } },
+                    grid: { color: 'rgba(255,255,255,0.03)', drawTicks: false },
+                    border: { color: 'rgba(255,255,255,0.05)' }
+                },
+                y: {
+                    stacked: true,
+                    ticks: { color: '#6868a0', font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.05)', borderDash: [4, 4] },
+                    border: { dash: [4, 4], color: 'rgba(255,255,255,0.05)' }
+                },
+                yPct: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 0,
+                    max: 100,
+                    ticks: { color: 'rgba(244,162,97,0.8)', font: { size: 10 }, callback: v => v + '%' },
+                    grid: { drawOnChartArea: false },
+                    border: { color: 'rgba(244,162,97,0.2)' }
+                }
             }
         },
-        plugins: [ChartDataLabels, stackedTopLabels]
+        plugins: [ChartDataLabels]
     });
 }
 
