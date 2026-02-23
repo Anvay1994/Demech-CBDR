@@ -1420,10 +1420,12 @@ function csvSafe(val) {
 
 function exportCSV(reportType) {
     const data = filteredData;
-    let csvContent = '';
+    // Start with 'sep=,' to force Excel to use comma regardless of regional settings
+    let csvContent = 'sep=,\r\n';
 
     if (reportType === 'production') {
-        csvContent = 'Sr.No.,Date,Shift,Production Supervisor,Name (QC),CB Pipe Size,Total Qty,Accepted Qty,Rejected Qty,Total Weight (Kg),Accepted Weight (Kg),Rejected Weight (Kg),Rejected %\n';
+        const headers = ['Sr.No.', 'Date', 'Shift', 'Production Supervisor', 'Name (QC)', 'CB Pipe Size', 'Total Qty', 'Accepted Qty', 'Rejected Qty', 'Total Weight (Kg)', 'Accepted Weight (Kg)', 'Rejected Weight (Kg)', 'Rejected %'];
+        csvContent += headers.map(csvSafe).join(',') + '\r\n';
 
         const groups = {};
         data.forEach(row => {
@@ -1450,12 +1452,13 @@ function exportCSV(reportType) {
                     pipe.rejectedWt.toFixed(1),
                     pipe.rejectedPct
                 ];
-                csvContent += rowArr.map(csvSafe).join(',') + '\n';
+                csvContent += rowArr.map(csvSafe).join(',') + '\r\n';
             });
             srNo++;
         });
     } else {
-        csvContent = 'Sr.No.,Date,Shift,Quality Supervisor (Name),Production Supervisor,CB Pipe Size,Total Qty,Accepted Qty,Rejected Qty,Total Weight (Kg),Accepted Weight (Kg),Rejected Weight (Kg),Rejected %\n';
+        const headers = ['Sr.No.', 'Date', 'Shift', 'Quality Supervisor (Name)', 'Production Supervisor', 'CB Pipe Size', 'Total Qty', 'Accepted Qty', 'Rejected Qty', 'Total Weight (Kg)', 'Accepted Weight (Kg)', 'Rejected Weight (Kg)', 'Rejected %'];
+        csvContent += headers.map(csvSafe).join(',') + '\r\n';
 
         let srNo = 1;
         data.forEach(row => {
@@ -1474,12 +1477,12 @@ function exportCSV(reportType) {
                 row.rejectedWt.toFixed(1),
                 row.rejectedPct
             ];
-            csvContent += rowArr.map(csvSafe).join(',') + '\n';
+            csvContent += rowArr.map(csvSafe).join(',') + '\r\n';
             srNo++;
         });
     }
 
-    // Add Byte Order Mark (BOM) so Excel handles UTF-8 (and our symbols) correctly
+    // Use Blob with BOM and correct encoding
     const blob = new Blob(['\ufeff', csvContent], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
