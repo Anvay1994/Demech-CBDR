@@ -752,14 +752,6 @@ function renderQualityReport() {
       `;
         tbody.appendChild(stRow);
 
-        // Accumulate grand totals
-        gtQty += stQty;
-        gtAcc += stAcc;
-        gtRej += stRej;
-        gtTotalWt += stTotalWt;
-        gtAccWt += stAccWt;
-        gtRejWt += stRejWt;
-
         srNo++;
     });
 
