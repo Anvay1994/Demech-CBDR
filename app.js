@@ -813,6 +813,14 @@ function renderQualitySummary() {
 
     const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
 
+    // Calculate Grand Totals from raw data to avoid double-counting unrolled names
+    const gtQty = data.reduce((s, r) => s + r.totalPipes, 0);
+    const gtAcc = data.reduce((s, r) => s + r.accepted, 0);
+    const gtRej = data.reduce((s, r) => s + r.rejected, 0);
+    const gtTotalWt = data.reduce((s, r) => s + r.totalWt, 0);
+    const gtAccWt = data.reduce((s, r) => s + r.acceptedWt, 0);
+    const gtRejWt = data.reduce((s, r) => s + r.rejectedWt, 0);
+
     let srNo = 1;
     sortedGroups.forEach(group => {
         const rejPct = group.totalWt > 0 ? ((group.rejectedWt / group.totalWt) * 100).toFixed(2) : '0.00';
@@ -833,6 +841,24 @@ function renderQualitySummary() {
         tbody.appendChild(tr);
         srNo++;
     });
+
+    // Grand Total Row
+    const gtRejPct = gtQty > 0 ? ((gtRej / gtQty) * 100).toFixed(2) : '0.00';
+    const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
+
+    const gtRow = document.createElement('tr');
+    gtRow.classList.add('grand-total-row');
+    gtRow.innerHTML = `
+        <td colspan="2"><strong>Grand Total</strong></td>
+        <td><strong>${gtQty}</strong></td>
+        <td><strong>${gtAcc}</strong></td>
+        <td><strong>${gtRej}</strong></td>
+        <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
+        <td><strong>${gtAccWt.toFixed(1)}</strong></td>
+        <td><strong>${gtRejWt.toFixed(1)}</strong></td>
+        <td><strong><span class="badge-rate ${gtRateClass}">${gtRejPct}%</span></strong></td>
+    `;
+    tbody.appendChild(gtRow);
 }
 
 // ============ CHARTS ============
