@@ -664,30 +664,27 @@ function renderQualityReport() {
         return;
     }
 
-    // Group by Date → Shift → Supervisor
+    // Group by Quality Supervisor Name
     const groups = {};
     data.forEach(row => {
-        const key = `${row.date}|${row.shift}|${row.supervisor}`;
-        if (!groups[key]) {
-            groups[key] = {
-                date: row.date,
-                shift: row.shift,
-                qcName: row.qcName || '—',
-                prodSupervisor: row.supervisor,
+        const qc = row.qcName || '—';
+        if (!groups[qc]) {
+            groups[qc] = {
+                qcName: qc,
                 pipes: []
             };
         }
-        if (row.qcName && groups[key].qcName === '—') {
-            groups[key].qcName = row.qcName;
-        }
-        groups[key].pipes.push(row);
+        groups[qc].pipes.push(row);
     });
+
+    // Sort supervisors alphabetically
+    const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
 
     // Grand totals
     let gtQty = 0, gtAcc = 0, gtRej = 0, gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
 
     let srNo = 1;
-    Object.values(groups).forEach(group => {
+    sortedGroups.forEach(group => {
         // Subtotals for this group
         let stQty = 0, stAcc = 0, stRej = 0, stTotalWt = 0, stAccWt = 0, stRejWt = 0;
 
@@ -712,10 +709,10 @@ function renderQualityReport() {
 
             tr.innerHTML = `
         <td>${idx === 0 ? srNo : ''}</td>
-        <td>${idx === 0 ? formatDate(group.date) : ''}</td>
-        <td>${idx === 0 ? group.shift : ''}</td>
-        <td>${idx === 0 ? group.qcName : ''}</td>
-        <td>${idx === 0 ? group.prodSupervisor : ''}</td>
+        <td>${idx === 0 ? `<strong>${group.qcName}</strong>` : ''}</td>
+        <td>${formatDate(pipe.date)}</td>
+        <td>${pipe.shift}</td>
+        <td>${pipe.supervisor}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.totalPipes}</td>
         <td class="badge-accepted">${pipe.accepted}</td>
@@ -786,37 +783,34 @@ function renderQualitySummary() {
     const tbody = document.getElementById('qualSummaryBody');
     tbody.innerHTML = '';
 
-    // Group by Date → Shift → QC Name for summary
+    // Group purely by QC Name for aggregate summary
     const groups = {};
     data.forEach(row => {
         const qc = row.qcName || '—';
-        const key = `${row.date}|${row.shift}|${qc}`;
-        if (!groups[key]) {
-            groups[key] = {
-                date: row.date,
-                shift: row.shift,
+        if (!groups[qc]) {
+            groups[qc] = {
                 qcName: qc,
                 totalWt: 0,
                 acceptedWt: 0,
                 rejectedWt: 0
             };
         }
-        groups[key].totalWt += row.totalWt;
-        groups[key].acceptedWt += row.acceptedWt;
-        groups[key].rejectedWt += row.rejectedWt;
+        groups[qc].totalWt += row.totalWt;
+        groups[qc].acceptedWt += row.acceptedWt;
+        groups[qc].rejectedWt += row.rejectedWt;
     });
 
+    const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
+
     let srNo = 1;
-    Object.values(groups).forEach(group => {
+    sortedGroups.forEach(group => {
         const rejPct = group.totalWt > 0 ? ((group.rejectedWt / group.totalWt) * 100).toFixed(2) : '0.00';
         const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
       <td>${srNo}</td>
-      <td>${formatDate(group.date)}</td>
-      <td>${group.shift}</td>
-      <td>${group.qcName}</td>
+      <td><strong>${group.qcName}</strong></td>
       <td>${group.totalWt.toFixed(1)}</td>
       <td>${group.acceptedWt.toFixed(1)}</td>
       <td>${group.rejectedWt.toFixed(1)}</td>
@@ -1475,7 +1469,7 @@ function exportCSV(reportType) {
             srNo++;
         });
     } else {
-        const headers = ['Sr.No.', 'Date', 'Shift', 'Quality Supervisor (Name)', 'Production Supervisor', 'CB Pipe Size', 'Total Qty', 'Accepted Qty', 'Rejected Qty', 'Total Weight (Kg)', 'Accepted Weight (Kg)', 'Rejected Weight (Kg)', 'Rejected %'];
+        const headers = ['Sr.No.', 'Quality Supervisor Name', 'Date', 'Shift', 'Production Supervisor Name', 'CB Pipe Size', 'Total Qty', 'Accepted Qty', 'Rejected Qty', 'Total Weight (Kg)', 'Accepted Weight (Kg)', 'Rejected Weight (Kg)', 'Rejected %'];
         csvContent += headers.map(csvSafe).join(',') + '\r\n';
 
         let srNo = 1;
