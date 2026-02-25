@@ -794,11 +794,17 @@ function renderQualitySummary() {
             if (!groups[qc]) {
                 groups[qc] = {
                     qcName: qc,
+                    totalPipes: 0,
+                    accepted: 0,
+                    rejected: 0,
                     totalWt: 0,
                     acceptedWt: 0,
                     rejectedWt: 0
                 };
             }
+            groups[qc].totalPipes += row.totalPipes;
+            groups[qc].accepted += row.accepted;
+            groups[qc].rejected += row.rejected;
             groups[qc].totalWt += row.totalWt;
             groups[qc].acceptedWt += row.acceptedWt;
             groups[qc].rejectedWt += row.rejectedWt;
@@ -816,6 +822,9 @@ function renderQualitySummary() {
         tr.innerHTML = `
       <td>${srNo}</td>
       <td><strong>${group.qcName}</strong></td>
+      <td>${group.totalPipes}</td>
+      <td>${group.accepted}</td>
+      <td>${group.rejected}</td>
       <td>${group.totalWt.toFixed(1)}</td>
       <td>${group.acceptedWt.toFixed(1)}</td>
       <td>${group.rejectedWt.toFixed(1)}</td>
