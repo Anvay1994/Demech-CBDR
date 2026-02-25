@@ -664,24 +664,33 @@ function renderQualityReport() {
         return;
     }
 
-    // Group by Quality Supervisor Name
+    // Group by Quality Supervisor Name (split comma-separated names)
     const groups = {};
     data.forEach(row => {
-        const qc = row.qcName || '—';
-        if (!groups[qc]) {
-            groups[qc] = {
-                qcName: qc,
-                pipes: []
-            };
-        }
-        groups[qc].pipes.push(row);
+        const names = (row.qcName || '—').split(',').map(n => n.trim()).filter(n => n);
+        if (names.length === 0) names.push('—');
+
+        names.forEach(qc => {
+            if (!groups[qc]) {
+                groups[qc] = {
+                    qcName: qc,
+                    pipes: []
+                };
+            }
+            groups[qc].pipes.push(row);
+        });
     });
 
     // Sort supervisors alphabetically
     const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
 
-    // Grand totals
-    let gtQty = 0, gtAcc = 0, gtRej = 0, gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
+    // Grand totals (calculate from data to avoid double-counting during unrolling)
+    const gtQty = data.reduce((s, r) => s + r.totalPipes, 0);
+    const gtAcc = data.reduce((s, r) => s + r.accepted, 0);
+    const gtRej = data.reduce((s, r) => s + r.rejected, 0);
+    const gtTotalWt = data.reduce((s, r) => s + r.totalWt, 0);
+    const gtAccWt = data.reduce((s, r) => s + r.acceptedWt, 0);
+    const gtRejWt = data.reduce((s, r) => s + r.rejectedWt, 0);
 
     let srNo = 1;
     sortedGroups.forEach(group => {
@@ -783,21 +792,25 @@ function renderQualitySummary() {
     const tbody = document.getElementById('qualSummaryBody');
     tbody.innerHTML = '';
 
-    // Group purely by QC Name for aggregate summary
+    // Group purely by QC Name for aggregate summary (split comma-separated names)
     const groups = {};
     data.forEach(row => {
-        const qc = row.qcName || '—';
-        if (!groups[qc]) {
-            groups[qc] = {
-                qcName: qc,
-                totalWt: 0,
-                acceptedWt: 0,
-                rejectedWt: 0
-            };
-        }
-        groups[qc].totalWt += row.totalWt;
-        groups[qc].acceptedWt += row.acceptedWt;
-        groups[qc].rejectedWt += row.rejectedWt;
+        const names = (row.qcName || '—').split(',').map(n => n.trim()).filter(n => n);
+        if (names.length === 0) names.push('—');
+
+        names.forEach(qc => {
+            if (!groups[qc]) {
+                groups[qc] = {
+                    qcName: qc,
+                    totalWt: 0,
+                    acceptedWt: 0,
+                    rejectedWt: 0
+                };
+            }
+            groups[qc].totalWt += row.totalWt;
+            groups[qc].acceptedWt += row.acceptedWt;
+            groups[qc].rejectedWt += row.rejectedWt;
+        });
     });
 
     const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
