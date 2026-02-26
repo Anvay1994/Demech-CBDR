@@ -204,34 +204,42 @@ function transformReportData(rawData) {
         // Calculate rejected weight
         const rejectedWt = row['Rejected Wt'] !== undefined ? parseFloat(row['Rejected Wt']) : (totalWt - acceptedWt);
 
+        let qcShift = '';
+        const rawQcShift = (row['Shift'] || '').trim().toLowerCase();
+        if (rawQcShift === 'l' || rawQcShift === 'i' || rawQcShift === '1') qcShift = 'I';
+        else if (rawQcShift === 'll' || rawQcShift === 'ii' || rawQcShift === '2') qcShift = 'II';
+        else if (rawQcShift === 'lll' || rawQcShift === 'iii' || rawQcShift === '3') qcShift = 'III';
+        else qcShift = (row['Shift'] || '').trim();
+
         // Use Input Date — handle both DD-MM-YYYY (from Apps Script) and ISO formats
-        let rawDate = '';
-        const inputDate = String(row['Input Date'] || row['Date for Output'] || row['Date'] || '').trim();
-        if (inputDate) {
-            // Check if already in DD-MM-YYYY format (from Google Apps Script)
-            const ddmmyyyy = inputDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+        const parseDateInput = (inputVal) => {
+            if (!inputVal) return '';
+            const ddmmyyyy = inputVal.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
             if (ddmmyyyy) {
-                // Already DD-MM-YYYY from Apps Script, use directly
-                const dd = ddmmyyyy[1].padStart(2, '0');
-                const mm = ddmmyyyy[2].padStart(2, '0');
-                rawDate = `${dd}-${mm}-${ddmmyyyy[3]}`;
-            } else {
-                // ISO or other format — parse carefully
-                const d = new Date(inputDate);
-                if (!isNaN(d.getTime())) {
-                    const dd = String(d.getDate()).padStart(2, '0');
-                    const mm = String(d.getMonth() + 1).padStart(2, '0');
-                    const yyyy = d.getFullYear();
-                    rawDate = `${dd}-${mm}-${yyyy}`;
-                }
+                return `${ddmmyyyy[1].padStart(2, '0')}-${ddmmyyyy[2].padStart(2, '0')}-${ddmmyyyy[3]}`;
             }
-        }
+            const d = new Date(inputVal);
+            if (!isNaN(d.getTime())) {
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                return `${dd}-${mm}-${yyyy}`;
+            }
+            return '';
+        };
+
+        const rawDate = parseDateInput(String(row['Input Date'] || row['Date'] || '').trim());
+        let rawQcDate = parseDateInput(String(row['Date for Output'] || '').trim());
+        // Fallback to input date if qc date is missing but qc shift exists
+        if (!rawQcDate && rawDate) rawQcDate = rawDate;
 
         return {
             sourceRows: [idx + 2], // Sheet row number (1-indexed header + 0-indexed data)
             dateShift: dateShift,
             date: rawDate,
             shift: shift,
+            qcDate: rawQcDate,
+            qcShift: qcShift,
             supervisor: (row['Supervisor'] || row['Supervisor '] || '').trim(),
             qcName: (row['Name'] || '').trim(),
             pipeSize: row['Pipe Size_Calculated'] || '',
@@ -250,16 +258,18 @@ function transformReportData(rawData) {
         };
     }).filter(r => r.totalPipes > 0);
 
-    // Aggregate by date + shift + supervisor + pipeSize so each pipe size is unique per group
+    // Aggregate by date + shift + qcDate + qcShift + supervisor + pipeSize so each pipe size is unique per group
     const aggMap = {};
     transformed.forEach(r => {
-        const key = `${r.date}|${r.shift}|${r.supervisor}|${r.pipeSize}`;
+        const key = `${r.date}|${r.shift}|${r.qcDate}|${r.qcShift}|${r.supervisor}|${r.pipeSize}`;
         if (!aggMap[key]) {
             aggMap[key] = {
                 sourceRows: [],
                 dateShift: r.dateShift,
                 date: r.date,
                 shift: r.shift,
+                qcDate: r.qcDate,
+                qcShift: r.qcShift,
                 supervisor: r.supervisor,
                 qcNames: new Set(),
                 pipeSize: r.pipeSize,
@@ -508,7 +518,6 @@ function renderProductionReport() {
         <td>${idx === 0 ? formatDate(group.date) : ''}</td>
         <td>${idx === 0 ? group.shift : ''}</td>
         <td>${idx === 0 ? group.supervisor : ''}</td>
-        <td>${idx === 0 ? (pipe.qcName || '—') : ''}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.totalPipes}</td>
         <td class="badge-accepted">${pipe.accepted}</td>
@@ -527,7 +536,7 @@ function renderProductionReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="5"></td>
+        <td colspan="4"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
@@ -556,7 +565,7 @@ function renderProductionReport() {
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="5"></td>
+        <td colspan="4"></td>
         <td><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
@@ -719,8 +728,8 @@ function renderQualityReport() {
             tr.innerHTML = `
         <td>${idx === 0 ? srNo : ''}</td>
         <td>${idx === 0 ? `<strong>${group.qcName}</strong>` : ''}</td>
-        <td>${formatDate(pipe.date)}</td>
-        <td>${pipe.shift}</td>
+        <td>${formatDate(pipe.qcDate || pipe.date)}</td>
+        <td>${pipe.qcShift || pipe.shift}</td>
         <td>${pipe.supervisor}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.totalPipes}</td>
@@ -1476,13 +1485,13 @@ function exportCSV(reportType) {
     let csvContent = 'sep=,\r\n';
 
     if (reportType === 'production') {
-        const headers = ['Sr.No.', 'Date', 'Shift', 'Production Supervisor', 'Name (QC)', 'CB Pipe Size', 'Total Qty', 'Accepted Qty', 'Rejected Qty', 'Total Weight (Kg)', 'Accepted Weight (Kg)', 'Rejected Weight (Kg)', 'Rejected %'];
+        const headers = ['Sr.No.', 'Date', 'Shift', 'Production Supervisor', 'CB Pipe Size', 'Total Qty', 'Accepted Qty', 'Rejected Qty', 'Total Weight (Kg)', 'Accepted Weight (Kg)', 'Rejected Weight (Kg)', 'Rejected %'];
         csvContent += headers.map(csvSafe).join(',') + '\r\n';
 
         const groups = {};
         data.forEach(row => {
             const key = `${row.date}|${row.shift}|${row.supervisor}`;
-            if (!groups[key]) groups[key] = { date: row.date, shift: row.shift, supervisor: row.supervisor, qcName: row.qcName || '—', pipes: [] };
+            if (!groups[key]) groups[key] = { date: row.date, shift: row.shift, supervisor: row.supervisor, pipes: [] };
             groups[key].pipes.push(row);
         });
 
@@ -1494,7 +1503,6 @@ function exportCSV(reportType) {
                     idx === 0 ? group.date : '',
                     idx === 0 ? group.shift : '',
                     idx === 0 ? group.supervisor : '',
-                    idx === 0 ? group.qcName : '',
                     pipe.pipeSize,
                     pipe.totalPipes,
                     pipe.accepted,
@@ -1516,9 +1524,9 @@ function exportCSV(reportType) {
         data.forEach(row => {
             const rowArr = [
                 srNo,
-                row.date,
-                row.shift,
                 row.qcName || '—',
+                row.qcDate || row.date,
+                row.qcShift || row.shift,
                 row.supervisor,
                 row.pipeSize,
                 row.totalPipes,
