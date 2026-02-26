@@ -289,6 +289,8 @@
                     <h3>⚠ Data Quality Report</h3>
                     <div style="display: flex; gap: 0.75rem; align-items: center;">
                         <span class="badge" id="dqReportCount">—</span>
+                        <button class="btn btn-secondary btn-sm" onclick="restoreAllFlags()"
+                            title="Restore all dismissed issues">↺ Restore Dismissed</button>
                     </div>
                 </div>
 
@@ -329,7 +331,7 @@
                                     <th>Details</th>
                                     <th style="width:120px;">Date</th>
                                     <th style="width:140px;">Affected</th>
-                                    <th style="width:120px;">Sheet Row(s)</th>
+                                    <th style="width:140px;">Related ID(s)</th>
                                 </tr>
                             </thead>
                             <tbody id="dqReportBody">

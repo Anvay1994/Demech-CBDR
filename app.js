@@ -234,7 +234,7 @@ function transformReportData(rawData) {
         if (!rawQcDate && rawDate) rawQcDate = rawDate;
 
         return {
-            sourceRows: [idx + 2], // Sheet row number (1-indexed header + 0-indexed data)
+            sourceRows: [row['Related ID'] || (idx + 2)], // Use Related ID if present, else fallback to Sheet row number
             dateShift: dateShift,
             date: rawDate,
             shift: shift,
@@ -1608,6 +1608,7 @@ function runErrorChecks(data, pipeMaster) {
                 const affectedRows = data.filter(r => r.supervisor === a || r.supervisor === b)
                     .flatMap(r => r.sourceRows || []);
                 flags.push({
+                    id: `sim_name_${a}_${b}`,
                     severity: 'warning',
                     type: 'Similar Names',
                     details: `"${a}" and "${b}" look similar (edit distance: ${dist}). Possible misspelling?`,
@@ -1633,6 +1634,7 @@ function runErrorChecks(data, pipeMaster) {
                 const affectedRows = data.filter(r => r.pipeSize === ps)
                     .flatMap(r => r.sourceRows || []);
                 flags.push({
+                    id: `inv_size_${ps}`,
                     severity: 'error',
                     type: 'Invalid Pipe Size',
                     details: `Pipe size "${ps}" not found in Pipe Master sheet.`,
@@ -1648,6 +1650,7 @@ function runErrorChecks(data, pipeMaster) {
     data.forEach(row => {
         if (row.accepted + row.rejected !== row.totalPipes) {
             flags.push({
+                id: `qty_mis_${row.sourceRows[0] || row.date}_${row.supervisor}`,
                 severity: 'error',
                 type: 'Qty Mismatch',
                 details: `Accepted (${row.accepted}) + Rejected (${row.rejected}) = ${row.accepted + row.rejected}, but Total is ${row.totalPipes}`,
@@ -1664,6 +1667,7 @@ function runErrorChecks(data, pipeMaster) {
             const rejRate = (row.rejected / row.totalPipes) * 100;
             if (rejRate > 40) {
                 flags.push({
+                    id: `high_rej_${row.sourceRows[0] || row.date}_${row.supervisor}`,
                     severity: 'warning',
                     type: 'High Rejection',
                     details: `Rejection rate ${rejRate.toFixed(1)}% exceeds 40% threshold.`,
@@ -1683,6 +1687,7 @@ function runErrorChecks(data, pipeMaster) {
         if (!row.date) missing.push('Date');
         if (missing.length > 0) {
             flags.push({
+                id: `miss_data_${row.sourceRows[0] || row.date}_${row.supervisor}`,
                 severity: 'error',
                 type: 'Missing Data',
                 details: `Missing fields: ${missing.join(', ')}`,
@@ -1700,7 +1705,37 @@ function runErrorChecks(data, pipeMaster) {
         return 0;
     });
 
-    return flags;
+    // Filter out dismissed flags
+    const dismissed = getDismissedFlags();
+    return flags.filter(f => !dismissed.includes(f.id));
+}
+
+// Manage Dismissed Flags in localStorage
+function getDismissedFlags() {
+    try {
+        const stored = localStorage.getItem('demech_dismissed_flags');
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
+}
+
+function dismissFlag(flagId) {
+    const dismissed = getDismissedFlags();
+    if (!dismissed.includes(flagId)) {
+        dismissed.push(flagId);
+        localStorage.setItem('demech_dismissed_flags', JSON.stringify(dismissed));
+    }
+    // Re-render Data Quality
+    dataQualityFlags = dataQualityFlags.filter(f => f.id !== flagId);
+    renderDataQuality();
+    showToast('Issue dismissed successfully', 'success');
+}
+
+function restoreAllFlags() {
+    localStorage.removeItem('demech_dismissed_flags');
+    showLoading(true);
+    initApp(); // Re-fetch and re-evaluate
 }
 
 function renderDataQuality() {
@@ -1754,7 +1789,12 @@ function renderDataQuality() {
             <td>${flag.details}</td>
             <td>${flag.date}</td>
             <td>${flag.affected}</td>
-            <td><span class="row-ids">${rowIdsStr}</span></td>
+            <td>
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="row-ids">${rowIdsStr}</span>
+                <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.7rem; margin-left:1rem;" onclick="dismissFlag('${flag.id}')" title="Dismiss Issue">✕</button>
+              </div>
+            </td>
         </tr>`;
     });
     tbody.innerHTML = html;
