@@ -779,11 +779,17 @@ body::before {
   padding-top: 0.8rem;
 }
 
-/* Sub-row (pipe sizes under same supervisor) */
-.report-table tbody tr.sub-row td:first-child,
-.report-table tbody tr.sub-row td:nth-child(2),
-.report-table tbody tr.sub-row td:nth-child(3),
-.report-table tbody tr.sub-row td:nth-child(4) {
+/* Sub-row (pipe sizes under same supervisor) for Production Report */
+.report-table tbody tr.sub-row.prod-sub-row td:first-child,
+.report-table tbody tr.sub-row.prod-sub-row td:nth-child(2),
+.report-table tbody tr.sub-row.prod-sub-row td:nth-child(3),
+.report-table tbody tr.sub-row.prod-sub-row td:nth-child(4) {
+  color: transparent;
+}
+
+/* Sub-row for Quality Report (only hide Sr No and Supervisor name) */
+.report-table tbody tr.sub-row.qual-sub-row td:first-child,
+.report-table tbody tr.sub-row.qual-sub-row td:nth-child(2) {
   color: transparent;
 }
 

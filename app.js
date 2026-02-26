@@ -497,7 +497,10 @@ function renderProductionReport() {
         group.pipes.forEach((pipe, idx) => {
             const tr = document.createElement('tr');
             if (idx === 0) tr.classList.add('group-start');
-            else tr.classList.add('sub-row');
+            else {
+                tr.classList.add('sub-row');
+                tr.classList.add('prod-sub-row');
+            }
 
             const totalWt = pipe.totalWt;
             const acceptedWt = pipe.acceptedWt;
@@ -709,7 +712,10 @@ function renderQualityReport() {
         group.pipes.forEach((pipe, idx) => {
             const tr = document.createElement('tr');
             if (idx === 0) tr.classList.add('group-start');
-            else tr.classList.add('sub-row');
+            else {
+                tr.classList.add('sub-row');
+                tr.classList.add('qual-sub-row');
+            }
 
             const totalWt = pipe.totalWt;
             const acceptedWt = pipe.acceptedWt;
