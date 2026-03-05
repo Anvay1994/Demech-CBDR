@@ -676,25 +676,36 @@ function renderQualityReport() {
         return;
     }
 
-    // Group by Quality Supervisor Name (split comma-separated names)
+    // Group by QC Date → QC Shift → Quality Supervisor Name
     const groups = {};
     data.forEach(row => {
         const names = (row.qcName || '—').split(',').map(n => n.trim()).filter(n => n);
         if (names.length === 0) names.push('—');
 
         names.forEach(qc => {
-            if (!groups[qc]) {
-                groups[qc] = {
+            const dateToUse = row.qcDate || row.date;
+            const shiftToUse = row.qcShift || row.shift;
+            const key = `${dateToUse}|${shiftToUse}|${qc}`;
+            if (!groups[key]) {
+                groups[key] = {
+                    date: dateToUse,
+                    shift: shiftToUse,
                     qcName: qc,
                     pipes: []
                 };
             }
-            groups[qc].pipes.push(row);
+            groups[key].pipes.push(row);
         });
     });
 
-    // Sort supervisors alphabetically
-    const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
+    // Sort by Date, then Shift, then QC Name
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+        const dateA = parseDate(a.date);
+        const dateB = parseDate(b.date);
+        if (dateA && dateB && dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+        if (a.shift !== b.shift) return a.shift.localeCompare(b.shift);
+        return a.qcName.localeCompare(b.qcName);
+    });
 
     // Grand totals (calculate from data to avoid double-counting during unrolling)
     const gtQty = data.reduce((s, r) => s + r.totalPipes, 0);
@@ -733,9 +744,9 @@ function renderQualityReport() {
 
             tr.innerHTML = `
         <td>${idx === 0 ? srNo : ''}</td>
+        <td>${idx === 0 ? formatDate(group.date) : ''}</td>
+        <td>${idx === 0 ? group.shift : ''}</td>
         <td>${idx === 0 ? `<strong>${group.qcName}</strong>` : ''}</td>
-        <td>${formatDate(pipe.qcDate || pipe.date)}</td>
-        <td>${pipe.qcShift || pipe.shift}</td>
         <td>${pipe.supervisor}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.totalPipes}</td>
