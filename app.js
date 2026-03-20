@@ -8,7 +8,7 @@
 // 1. Deploy the Google Apps Script (see google_apps_script.js)
 // 2. Paste the Web App URL below
 // 3. The sheet data stays PRIVATE — only the script can read it
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzU0kl9m9HXm8Awq2aQjf9MPO4wRjvj1FCbytIe5EXI5nFQ48aaNCKx1hem3mOlrbv2/exec'; // ← PASTE YOUR WEB APP URL HERE
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZsyLRr3OaYV1NHDJz7gTTId87JHzNauyzQR8S3kWo7l3EuufFt5gnjIaP7-_Qt1qz/exec'; // ← PASTE YOUR WEB APP URL HERE
 const API_TOKEN = 'demech_secure_2025'; // Must match the token in google_apps_script.js
 
 const SHEETS = {
@@ -117,18 +117,36 @@ async function fetchSheetData(sheetName) {
 
     try {
         const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}&sheet=${encodeURIComponent(sheetName)}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        // mode: 'cors' is default, but we're being explicit. 
+        // No special headers are added to keep it a "simple" request (no preflight).
+        const response = await fetch(url, {
+            method: 'GET',
+            redirect: 'follow'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const json = await response.json();
 
         if (json.error) {
             throw new Error(json.error);
         }
 
-        // Convert JSON rows to same format as CSV parser output
         return json.data || [];
+
     } catch (err) {
         console.error(`Error fetching sheet "${sheetName}":`, err);
+
+        // Standard fetch error for CORS/Network issues is TypeError: Failed to fetch
+        if (err instanceof TypeError || err.message === 'Failed to fetch') {
+            const corsMsg = `Connection Blocked (CORS). Please ensure your Google Apps Script is deployed as "Web App", with "Execute as: Me" and "Who has access: Anyone".`;
+            showToast(corsMsg, 'error');
+            throw new Error(corsMsg);
+        }
+
         throw err;
     }
 }

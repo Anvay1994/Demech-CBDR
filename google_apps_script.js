@@ -25,48 +25,65 @@
 var API_TOKEN = 'demech_secure_2025';
 
 function doGet(e) {
-    // Verify the security token
-    var token = e.parameter.token;
-    if (token !== API_TOKEN) {
-        return ContentService.createTextOutput(
-            JSON.stringify({ error: 'Unauthorized' })
-        ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var sheetName = e.parameter.sheet || 'Report Format';
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(sheetName);
-
-    if (!sheet) {
-        return ContentService.createTextOutput(
-            JSON.stringify({ error: 'Sheet not found: ' + sheetName })
-        ).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var rows = [];
-
-    for (var i = 1; i < data.length; i++) {
-        var row = {};
-        var hasData = false;
-        for (var j = 0; j < headers.length; j++) {
-            var key = String(headers[j]).trim();
-            var val = data[i][j];
-
-            // Convert dates to string format
-            if (val instanceof Date) {
-                val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd-MM-yyyy');
-            }
-
-            row[key] = val;
-            if (val !== '' && val !== 0 && val !== null) hasData = true;
+    try {
+        // Verify the security token
+        var token = e.parameter.token;
+        if (token !== API_TOKEN) {
+            return JSON_RESPONSE({ error: 'Unauthorized: Invalid token' });
         }
-        if (hasData) rows.push(row);
+
+        var sheetName = e.parameter.sheet || 'Report Format';
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        if (!ss) {
+            return JSON_RESPONSE({ error: 'Spreadsheet not found or script not bound correctly' });
+        }
+
+        var sheet = ss.getSheetByName(sheetName);
+        if (!sheet) {
+            return JSON_RESPONSE({ error: 'Sheet not found: ' + sheetName });
+        }
+
+        var data = sheet.getDataRange().getValues();
+        if (!data || data.length < 1) {
+            return JSON_RESPONSE({ data: [] });
+        }
+
+        var headers = data[0];
+        var rows = [];
+
+        for (var i = 1; i < data.length; i++) {
+            var row = {};
+            var hasData = false;
+            for (var j = 0; j < headers.length; j++) {
+                var key = String(headers[j]).trim();
+                if (!key) continue;
+                var val = data[i][j];
+
+                // Convert dates to string format
+                if (val instanceof Date) {
+                    val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd-MM-yyyy');
+                }
+
+                row[key] = val;
+                if (val !== '' && val !== 0 && val !== null) hasData = true;
+            }
+            if (hasData) rows.push(row);
+        }
+
+        return JSON_RESPONSE({ data: rows });
+
+    } catch (err) {
+        return JSON_RESPONSE({
+            error: 'Script Error: ' + err.toString(),
+            details: 'Make sure the sheet names match and the script has permission to access the spreadsheet.'
+        });
     }
+}
 
-    var response = JSON.stringify({ data: rows });
-
-    return ContentService.createTextOutput(response)
+/**
+ * Helper to return a CORS-friendly JSON response
+ */
+function JSON_RESPONSE(obj) {
+    return ContentService.createTextOutput(JSON.stringify(obj))
         .setMimeType(ContentService.MimeType.JSON);
 }
