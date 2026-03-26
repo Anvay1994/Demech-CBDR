@@ -271,6 +271,8 @@ function transformReportData(rawData) {
         const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor', 'Supervisor ']);
         const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'Name', 'QC Name']);
 
+        const trolleyNo = (row['Trolley no'] || row['Trolley No'] || row['Trolley No.'] || '').trim();
+
         return {
             sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)], // Use ID or Related ID if present, else fallback to Sheet row number
             dateShift: dateShift,
@@ -281,6 +283,7 @@ function transformReportData(rawData) {
             supervisor: supervisor,
             qcName: qcName,
             pipeSize: row['Pipe Size_Calculated'] || '',
+            trolleyNo: trolleyNo,
             totalPipes,
             wtPerPipe,
             totalWt,
@@ -299,7 +302,8 @@ function transformReportData(rawData) {
     // Aggregate by date + shift + qcDate + qcShift + supervisor + pipeSize so each pipe size is unique per group
     const aggMap = {};
     transformed.forEach(r => {
-        const key = `${r.date}|${r.shift}|${r.qcDate}|${r.qcShift}|${r.supervisor}|${r.pipeSize}`;
+        // Group by Date, Shift, QC Date, QC Shift, Supervisor, Pipe Size AND Trolley No for subtotals
+        const key = `${r.date}|${r.shift}|${r.qcDate}|${r.qcShift}|${r.supervisor}|${r.pipeSize}|${r.trolleyNo}`;
         if (!aggMap[key]) {
             aggMap[key] = {
                 sourceRows: [],
@@ -311,6 +315,7 @@ function transformReportData(rawData) {
                 supervisor: r.supervisor,
                 qcNames: new Set(),
                 pipeSize: r.pipeSize,
+                trolleyNo: r.trolleyNo,
                 totalPipes: 0,
                 wtPerPipe: r.wtPerPipe,
                 totalWt: 0,
@@ -420,6 +425,7 @@ function applyFilters() {
     const shift = document.getElementById('filterShift')?.value;
     const supervisor = document.getElementById('filterSupervisor')?.value;
     const pipeSize = document.getElementById('filterPipeSize')?.value;
+    const trolley = document.getElementById('filterTrolley')?.value;
 
     filteredData = allData.filter(row => {
         // Date filter — parse as local dates to avoid UTC shift
@@ -441,6 +447,8 @@ function applyFilters() {
         if (supervisor && supervisor !== 'all' && row.supervisor !== supervisor) return false;
         // Pipe Size filter
         if (pipeSize && pipeSize !== 'all' && row.pipeSize !== pipeSize) return false;
+        // Trolley filter
+        if (trolley && trolley !== 'all' && row.trolleyNo !== trolley) return false;
 
         return true;
     });
@@ -454,16 +462,19 @@ function resetFilters() {
     document.getElementById('filterShift').value = 'all';
     document.getElementById('filterSupervisor').value = 'all';
     document.getElementById('filterPipeSize').value = 'all';
+    document.getElementById('filterTrolley').value = 'all';
     filteredData = [...allData];
     renderAll();
 }
 
 function populateFilterOptions() {
     const supervisors = [...new Set(allData.map(r => r.supervisor))].sort();
-    const pipeSizes = [...new Set(allData.map(r => r.pipeSize))].sort();
+    const pipeSizes = [...new Set(allData.map(r => r.pipeSize))].filter(Boolean).sort();
+    const trolleys = [...new Set(allData.map(r => r.trolleyNo))].filter(Boolean).sort();
 
     const supSelect = document.getElementById('filterSupervisor');
     const psSelect = document.getElementById('filterPipeSize');
+    const trolSelect = document.getElementById('filterTrolley');
 
     supSelect.innerHTML = '<option value="all">All Supervisors</option>';
     supervisors.forEach(s => {
@@ -474,6 +485,13 @@ function populateFilterOptions() {
     pipeSizes.forEach(ps => {
         psSelect.innerHTML += `<option value="${ps}">${ps}</option>`;
     });
+
+    if (trolSelect) {
+        trolSelect.innerHTML = '<option value="all">All Trolleys</option>';
+        trolleys.forEach(t => {
+            trolSelect.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+    }
 }
 
 // ============ KPI RENDERING ============
@@ -509,15 +527,16 @@ function renderProductionReport() {
         return;
     }
 
-    // Group by Date → Shift → Supervisor → Pipe Sizes
+    // Group by Date → Shift → Supervisor → Trolley → Pipe Sizes
     const groups = {};
     data.forEach(row => {
-        const key = `${row.date}|${row.shift}|${row.supervisor}`;
+        const key = `${row.date}|${row.shift}|${row.supervisor}|${row.trolleyNo}`;
         if (!groups[key]) {
             groups[key] = {
                 date: row.date,
                 shift: row.shift,
                 supervisor: row.supervisor,
+                trolleyNo: row.trolleyNo,
                 pipes: []
             };
         }
@@ -560,6 +579,7 @@ function renderProductionReport() {
         <td>${idx === 0 ? group.shift : ''}</td>
         <td>${idx === 0 ? group.supervisor : ''}</td>
         <td>${pipe.pipeSize}</td>
+        <td>${pipe.trolleyNo}</td>
         <td>${pipe.totalPipes}</td>
         <td class="badge-accepted">${pipe.accepted}</td>
         <td class="badge-rejected">${pipe.rejected}</td>
@@ -577,7 +597,7 @@ function renderProductionReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="4"></td>
+        <td colspan="6"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
@@ -606,7 +626,7 @@ function renderProductionReport() {
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="4"></td>
+        <td colspan="6"></td>
         <td><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
@@ -723,12 +743,13 @@ function renderQualityReport() {
         names.forEach(qc => {
             const dateToUse = row.qcDate || row.date;
             const shiftToUse = row.qcShift || row.shift;
-            const key = `${dateToUse}|${shiftToUse}|${qc}`;
+            const key = `${dateToUse}|${shiftToUse}|${qc}|${row.trolleyNo}`;
             if (!groups[key]) {
                 groups[key] = {
                     date: dateToUse,
                     shift: shiftToUse,
                     qcName: qc,
+                    trolleyNo: row.trolleyNo,
                     pipes: []
                 };
             }
@@ -787,6 +808,7 @@ function renderQualityReport() {
         <td>${idx === 0 ? `<strong>${group.qcName}</strong>` : ''}</td>
         <td>${pipe.supervisor}</td>
         <td>${pipe.pipeSize}</td>
+        <td>${pipe.trolleyNo}</td>
         <td>${pipe.totalPipes}</td>
         <td class="badge-accepted">${pipe.accepted}</td>
         <td class="badge-rejected">${pipe.rejected}</td>
@@ -804,7 +826,7 @@ function renderQualityReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="5"></td>
+        <td colspan="6"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
@@ -825,7 +847,7 @@ function renderQualityReport() {
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="5"></td>
+        <td colspan="6"></td>
         <td><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
@@ -1822,6 +1844,7 @@ function jumpToIssue(flagId) {
 
     // 2. Clear other filters
     document.getElementById('filterShift').value = 'all';
+    if (document.getElementById('filterTrolley')) document.getElementById('filterTrolley').value = 'all';
 
     // 3. Apply the filters to data
     applyFilters();
