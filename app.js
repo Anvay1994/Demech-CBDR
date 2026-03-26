@@ -272,8 +272,12 @@ function transformReportData(rawData) {
         const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'Name', 'QC Name']);
         const trolleyNo = getField(row, ['trolley'], ['Trolley no', 'Trolley No', 'Trolley No.']);
 
+        const lDateRaw = getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date ']);
+        const lTimeRaw = getField(row, ['loading time'], ['Loading Time', 'Loading time']);
+        const qTimeRaw = getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time ']);
+
         return {
-            sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)], // Use ID or Related ID if present, else fallback to Sheet row number
+            sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)],
             dateShift: dateShift,
             date: rawDate,
             shift: shift,
@@ -281,13 +285,10 @@ function transformReportData(rawData) {
             qcShift: qcShift,
             supervisor: supervisor,
             qcName: qcName,
-            supervisor: supervisor,
-            qcName: qcName,
-            loadingDate: formatDate(getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date '])),
-            loadingTime: formatTimeLocal(getField(row, ['loading time'], ['Loading Time', 'Loading time'])),
-            qcTime: formatTimeLocal(getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time '])),
-            hoursCycle: formatDuration(getField(row, ['hour cycle', 'hours cycle'], ['Hour Cycle', 'Hours Cycle', 'Hour Cycle ', 'Hour_Cycle'])),
-            pipeSize: row['Pipe Size_Calculated'] || '',
+            loadingDate: formatDate(lDateRaw),
+            loadingTime: formatTimeLocal(lTimeRaw),
+            qcTime: formatTimeLocal(qTimeRaw),
+            hoursCycle: calculateCycleTime(lDateRaw, lTimeRaw, rawQcDate, qTimeRaw),
             pipeSize: row['Pipe Size_Calculated'] || '',
             trolleyNo: trolleyNo,
             prodRej: parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0,
@@ -427,8 +428,6 @@ function formatDuration(val) {
     if (isNaN(d.getTime()) || !String(val).includes('T')) return val;
     
     // Google Sheets uses 1899-12-30 00:00:00 as the base for DURATIONS
-    // but sometimes the API returns it with a timezone offset.
-    // We calculate the difference from 1899-12-30T00:00:00Z (UTC)
     const base = new Date('1899-12-30T00:00:00.000Z');
     const diffMs = d.getTime() - base.getTime();
     
@@ -439,6 +438,45 @@ function formatDuration(val) {
     const seconds = absSeconds % 60;
     
     return `${totalSeconds < 0 ? '-' : ''}${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function calculateCycleTime(loadingDate, loadingTime, qcDate, qcTime) {
+    if (!loadingDate || !qcDate) return '—';
+    const lDate = parseDate(loadingDate);
+    const qDate = parseDate(qcDate);
+    if (!lDate || !qDate) return '—';
+
+    const getHMS = (timeStr) => {
+        if (!timeStr) return { h: 0, m: 0, s: 0 };
+        const s = String(timeStr).trim();
+        if (s.includes('T')) {
+            const t = new Date(s);
+            if (!isNaN(t.getTime())) {
+                if (s.includes('Z')) return { h: t.getUTCHours(), m: t.getUTCMinutes(), s: t.getUTCSeconds() };
+                return { h: t.getHours(), m: t.getMinutes(), s: t.getSeconds() };
+            }
+        }
+        const parts = s.split(':');
+        return {
+            h: parseInt(parts[0]) || 0,
+            m: parseInt(parts[1]) || 0,
+            s: parseInt(parts[2]) || 0
+        };
+    };
+
+    const lt = getHMS(loadingTime);
+    const qt = getHMS(qcTime);
+    const start = new Date(lDate); start.setHours(lt.h, lt.m, lt.s, 0);
+    const end = new Date(qDate); end.setHours(qt.h, qt.m, qt.s, 0);
+    
+    const diffMs = end.getTime() - start.getTime();
+    if (diffMs < 0) return '0:00:00';
+
+    const totalSec = Math.round(diffMs / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function getMonthKey(dateStr) {
