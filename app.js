@@ -479,6 +479,16 @@ function calculateCycleTime(loadingDate, loadingTime, qcDate, qcTime) {
     return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+function getRejectionTooltip(r) {
+    const parts = [];
+    if (r.cavity > 0) parts.push(`Cavity: ${r.cavity}`);
+    if (r.cracks > 0) parts.push(`Cracks: ${r.cracks}`);
+    if (r.rCracks > 0) parts.push(`R Cracks: ${r.rCracks}`);
+    if (r.ovality > 0) parts.push(`Ovality: ${r.ovality}`);
+    if (r.others > 0) parts.push(`Others: ${r.others}`);
+    return parts.length > 0 ? parts.join('\n') : 'No specific defect details';
+}
+
 function getMonthKey(dateStr) {
     const d = parseDate(dateStr);
     if (!d || isNaN(d.getTime())) return '';
@@ -945,6 +955,7 @@ function renderQualityReport() {
     let srNo = 1;
     sortedGroups.forEach(group => {
         let stQty = 0, stAcc = 0, stRej = 0, stTotalWt = 0, stAccWt = 0, stRejWt = 0;
+        let stDefects = { cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0 };
 
         group.pipes.forEach((pipe, idx) => {
             const tr = document.createElement('tr');
@@ -967,6 +978,12 @@ function renderQualityReport() {
             stAccWt += acceptedWt;
             stRejWt += rejectedWt;
 
+            stDefects.cavity += pipe.cavity;
+            stDefects.cracks += pipe.cracks;
+            stDefects.rCracks += pipe.rCracks;
+            stDefects.ovality += pipe.ovality;
+            stDefects.others += pipe.others;
+
             tr.innerHTML = `
                 <td>${idx === 0 ? srNo : ''}</td>
                 <td>${idx === 0 ? formatDate(group.date) : ''}</td>
@@ -978,7 +995,7 @@ function renderQualityReport() {
                 ${showTimeline ? '<td></td><td></td><td></td><td></td>' : ''}
                 <td>${pipe.totalPipes}</td>
                 <td class="badge-accepted">${pipe.accepted}</td>
-                <td class="badge-rejected">${pipe.rejected}</td>
+                <td class="badge-rejected" title="${getRejectionTooltip(pipe)}">${pipe.rejected}</td>
                 <td>${totalWt.toFixed(1)}</td>
                 <td>${acceptedWt.toFixed(1)}</td>
                 <td>${rejectedWt.toFixed(1)}</td>
@@ -1002,7 +1019,7 @@ function renderQualityReport() {
             ` : ''}
             <td><strong>${stQty}</strong></td>
             <td><strong>${stAcc}</strong></td>
-            <td><strong>${stRej}</strong></td>
+            <td><strong class="badge-rejected" title="${getRejectionTooltip(stDefects)}">${stRej}</strong></td>
             <td><strong>${stTotalWt.toFixed(1)}</strong></td>
             <td><strong>${stAccWt.toFixed(1)}</strong></td>
             <td><strong>${stRejWt.toFixed(1)}</strong></td>
@@ -1056,7 +1073,8 @@ function renderQualitySummary() {
                     rejected: 0,
                     totalWt: 0,
                     acceptedWt: 0,
-                    rejectedWt: 0
+                    rejectedWt: 0,
+                    cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0
                 };
             }
             groups[qc].totalPipes += row.totalPipes;
@@ -1065,6 +1083,11 @@ function renderQualitySummary() {
             groups[qc].totalWt += row.totalWt;
             groups[qc].acceptedWt += row.acceptedWt;
             groups[qc].rejectedWt += row.rejectedWt;
+            groups[qc].cavity += row.cavity;
+            groups[qc].cracks += row.cracks;
+            groups[qc].rCracks += row.rCracks;
+            groups[qc].ovality += row.ovality;
+            groups[qc].others += row.others;
         });
     });
 
@@ -1089,7 +1112,7 @@ function renderQualitySummary() {
       <td><strong>${group.qcName}</strong></td>
       <td>${group.totalPipes}</td>
       <td>${group.accepted}</td>
-      <td>${group.rejected}</td>
+      <td><span class="badge-rejected" title="${getRejectionTooltip(group)}">${group.rejected}</span></td>
       <td>${group.totalWt.toFixed(1)}</td>
       <td>${group.acceptedWt.toFixed(1)}</td>
       <td>${group.rejectedWt.toFixed(1)}</td>
