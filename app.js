@@ -1663,7 +1663,8 @@ function runErrorChecks(data, pipeMaster) {
                     details: `"${a}" and "${b}" look similar (edit distance: ${dist}). Possible misspelling?`,
                     date: '—',
                     affected: `${a}, ${b}`,
-                    rowIds: affectedRows
+                    rowIds: affectedRows,
+                    context: { tab: 'production', supervisor: a } // Will filter for first name in pair
                 });
             }
         }
@@ -1689,7 +1690,8 @@ function runErrorChecks(data, pipeMaster) {
                     details: `Pipe size "${ps}" not found in Pipe Master sheet.`,
                     date: '—',
                     affected: ps,
-                    rowIds: affectedRows
+                    rowIds: affectedRows,
+                    context: { tab: 'production', pipeSize: ps }
                 });
             }
         });
@@ -1705,7 +1707,8 @@ function runErrorChecks(data, pipeMaster) {
                 details: `Accepted (${row.accepted}) + Rejected (${row.rejected}) = ${row.accepted + row.rejected}, but Total is ${row.totalPipes}`,
                 date: row.date || '—',
                 affected: `${row.supervisor} / ${row.pipeSize}`,
-                rowIds: row.sourceRows || []
+                rowIds: row.sourceRows || [],
+                context: { tab: 'production', date: row.date, supervisor: row.supervisor, pipeSize: row.pipeSize }
             });
         }
     });
@@ -1722,7 +1725,8 @@ function runErrorChecks(data, pipeMaster) {
                     details: `Rejection rate ${rejRate.toFixed(1)}% exceeds 40% threshold.`,
                     date: row.date || '—',
                     affected: `${row.supervisor} / ${row.pipeSize}`,
-                    rowIds: row.sourceRows || []
+                    rowIds: row.sourceRows || [],
+                    context: { tab: 'quality', date: row.date, supervisor: row.supervisor, pipeSize: row.pipeSize }
                 });
             }
         }
@@ -1742,7 +1746,8 @@ function runErrorChecks(data, pipeMaster) {
                 details: `Missing fields: ${missing.join(', ')}`,
                 date: row.date || '—',
                 affected: row.supervisor || 'Unknown',
-                rowIds: row.sourceRows || []
+                rowIds: row.sourceRows || [],
+                context: { tab: 'production', date: row.date, supervisor: row.supervisor, pipeSize: row.pipeSize }
             });
         }
     });
@@ -1779,6 +1784,52 @@ function dismissFlag(flagId) {
     dataQualityFlags = dataQualityFlags.filter(f => f.id !== flagId);
     renderDataQuality();
     showToast('Issue dismissed successfully', 'success');
+}
+
+function jumpToIssue(flagId) {
+    const flag = dataQualityFlags.find(f => f.id === flagId);
+    if (!flag || !flag.context) return;
+
+    const ctx = flag.context;
+
+    // 1. Apply filters
+    if (ctx.date && ctx.date !== '—') {
+        // Convert DD-MM-YYYY to YYYY-MM-DD for input[type=date]
+        const parts = ctx.date.split('-');
+        if (parts.length === 3) {
+            const yyyymmdd = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            document.getElementById('filterDateFrom').value = yyyymmdd;
+            document.getElementById('filterDateTo').value = yyyymmdd;
+        }
+    } else {
+        document.getElementById('filterDateFrom').value = '';
+        document.getElementById('filterDateTo').value = '';
+    }
+
+    if (ctx.supervisor) {
+        const supSelect = document.getElementById('filterSupervisor');
+        if (supSelect) supSelect.value = ctx.supervisor;
+    } else {
+        document.getElementById('filterSupervisor').value = 'all';
+    }
+
+    if (ctx.pipeSize) {
+        const psSelect = document.getElementById('filterPipeSize');
+        if (psSelect) psSelect.value = ctx.pipeSize;
+    } else {
+        document.getElementById('filterPipeSize').value = 'all';
+    }
+
+    // 2. Clear other filters
+    document.getElementById('filterShift').value = 'all';
+
+    // 3. Apply the filters to data
+    applyFilters();
+
+    // 4. Switch tab
+    switchTab(ctx.tab || 'production');
+
+    showToast(`Showing issue context in ${ctx.tab} report`, 'success');
 }
 
 function restoreAllFlags() {
@@ -1830,7 +1881,6 @@ function renderDataQuality() {
     dataQualityFlags.forEach((flag, idx) => {
         const severityClass = flag.severity === 'error' ? 'severity-error' : 'severity-warning';
         const severityLabel = flag.severity === 'error' ? '🔴 Error' : '🟡 Warning';
-        const rowIdsStr = (flag.rowIds && flag.rowIds.length > 0) ? flag.rowIds.join(', ') : '—';
         html += `<tr class="${severityClass}">
             <td>${idx + 1}</td>
             <td><span class="severity-pill ${flag.severity}">${severityLabel}</span></td>
@@ -1838,11 +1888,11 @@ function renderDataQuality() {
             <td>${flag.details}</td>
             <td>${flag.date}</td>
             <td>${flag.affected}</td>
-            <td>
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <span class="row-ids">${rowIdsStr}</span>
-                <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.7rem; margin-left:1rem;" onclick="dismissFlag('${flag.id}')" title="Dismiss Issue">✕</button>
-              </div>
+            <td style="text-align:center;">
+                <div style="display:flex; gap:0.5rem; justify-content:center; align-items:center;">
+                    <button class="btn btn-primary btn-sm" style="padding:0.2rem 0.6rem; font-size:0.75rem;" onclick="jumpToIssue('${flag.id}')" title="Find in Report">👁 View</button>
+                    <button class="btn btn-secondary btn-sm" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="dismissFlag('${flag.id}')" title="Dismiss Issue">✕</button>
+                </div>
             </td>
         </tr>`;
     });
