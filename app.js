@@ -610,8 +610,8 @@ function renderProductionReport() {
         <td></td>
         <td class="col-bl"><strong>${stProdRej}</strong></td>
         <td class="col-bl"><strong>${stProdRejWt.toFixed(1)}</strong></td>
-        <td colspan="5"></td>
-        <td><strong>Subtotal</strong></td>
+        <td colspan="4"></td>
+        <td style="text-align:right;"><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
         <td><strong>${stRej}</strong></td>
@@ -647,15 +647,15 @@ function renderProductionReport() {
         <td></td>
         <td class="col-bl"><strong>${gtProdRej}</strong></td>
         <td class="col-bl"><strong>${gtProdRejWt.toFixed(1)}</strong></td>
-        <td colspan="5"></td>
-        <td><strong>Grand Total</strong></td>
+        <td colspan="4"></td>
+        <td style="text-align:right;"><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong>${gtRej}</strong></td>
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${gtRateClass}">${gtRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${gtRejPct}%">${gtRejPct}%</span></strong></td>
       `;
     tbody.appendChild(gtRow);
 
