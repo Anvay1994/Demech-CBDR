@@ -604,7 +604,10 @@ function renderProductionReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="8"></td>
+        <td></td>
+        <td class="col-bl"><strong>${a.prodRej}</strong></td>
+        <td class="col-bl"><strong>${a.prodRejWt.toFixed(1)}</strong></td>
+        <td colspan="5"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
@@ -632,8 +635,16 @@ function renderProductionReport() {
     const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
+    
+    // Calculate BL Grand Totals
+    const gtProdRej = data.reduce((s, r) => s + r.prodRej, 0);
+    const gtProdRejWt = data.reduce((s, r) => s + r.prodRejWt, 0);
+
     gtRow.innerHTML = `
-        <td colspan="8"></td>
+        <td></td>
+        <td class="col-bl"><strong>${gtProdRej}</strong></td>
+        <td class="col-bl"><strong>${gtProdRejWt.toFixed(1)}</strong></td>
+        <td colspan="5"></td>
         <td><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>

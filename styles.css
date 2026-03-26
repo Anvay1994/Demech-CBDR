@@ -42,9 +42,10 @@
 }
 
 .col-bl { 
-  background-color: rgba(244, 162, 97, 0.08) !important; 
-  color: #f4a261 !important; 
-  font-weight: 500;
+  background-color: rgba(244, 162, 97, 0.04) !important; 
+  color: var(--text-secondary) !important; 
+  font-weight: 400;
+  border-right: 1px solid rgba(244, 162, 97, 0.1) !important;
 }
 
 
