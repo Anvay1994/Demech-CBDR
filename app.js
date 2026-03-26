@@ -802,78 +802,52 @@ function renderProductionSummary() {
     const tbody = document.getElementById('prodSummaryBody');
     tbody.innerHTML = '';
 
-    // Group by supervisor
+    // Group by supervisor (Simple list)
     const supGroups = {};
     data.forEach(row => {
-        if (!supGroups[row.supervisor]) {
-            supGroups[row.supervisor] = { daily: {}, monthly: {}, yearly: {} };
+        const sup = row.supervisor || '—';
+        if (!supGroups[sup]) {
+            supGroups[sup] = {
+                supervisor: sup,
+                totalPipes: 0,
+                accepted: 0,
+                rejected: 0,
+                totalWt: 0,
+                acceptedWt: 0,
+                rejectedWt: 0
+            };
         }
-        const dateKey = row.date;
-        const monthKey = getMonthKey(row.date);
-        const yearKey = getYearKey(row.date);
-
-        // Daily
-        if (!supGroups[row.supervisor].daily[dateKey]) {
-            supGroups[row.supervisor].daily[dateKey] = { totalWt: 0, acceptedWt: 0, rejectedWt: 0 };
-        }
-        supGroups[row.supervisor].daily[dateKey].totalWt += row.totalWt;
-        supGroups[row.supervisor].daily[dateKey].acceptedWt += row.acceptedWt;
-        supGroups[row.supervisor].daily[dateKey].rejectedWt += row.rejectedWt;
-
-        // Monthly
-        if (!supGroups[row.supervisor].monthly[monthKey]) {
-            supGroups[row.supervisor].monthly[monthKey] = { totalWt: 0, acceptedWt: 0, rejectedWt: 0 };
-        }
-        supGroups[row.supervisor].monthly[monthKey].totalWt += row.totalWt;
-        supGroups[row.supervisor].monthly[monthKey].acceptedWt += row.acceptedWt;
-        supGroups[row.supervisor].monthly[monthKey].rejectedWt += row.rejectedWt;
-
-        // Yearly
-        if (!supGroups[row.supervisor].yearly[yearKey]) {
-            supGroups[row.supervisor].yearly[yearKey] = { totalWt: 0, acceptedWt: 0, rejectedWt: 0 };
-        }
-        supGroups[row.supervisor].yearly[yearKey].totalWt += row.totalWt;
-        supGroups[row.supervisor].yearly[yearKey].acceptedWt += row.acceptedWt;
-        supGroups[row.supervisor].yearly[yearKey].rejectedWt += row.rejectedWt;
+        supGroups[sup].totalPipes += row.totalPipes;
+        supGroups[sup].accepted += row.accepted;
+        supGroups[sup].rejected += row.rejected;
+        supGroups[sup].totalWt += row.totalWt;
+        supGroups[sup].acceptedWt += row.acceptedWt;
+        supGroups[sup].rejectedWt += row.rejectedWt;
     });
 
     let srNo = 1;
-    Object.entries(supGroups).forEach(([supervisor, periods]) => {
-        const types = [
-            { label: 'Daily', data: periods.daily },
-            { label: 'Monthly', data: periods.monthly },
-            { label: 'Yearly', data: periods.yearly }
-        ];
+    Object.values(supGroups).sort((a, b) => a.supervisor.localeCompare(b.supervisor)).forEach(group => {
+        const rejPct = group.totalPipes > 0 ? ((group.rejected / group.totalPipes) * 100).toFixed(1) : '0.0';
+        const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
-        types.forEach((type, typeIdx) => {
-            const totals = Object.values(type.data).reduce((acc, d) => {
-                acc.totalWt += d.totalWt;
-                acc.acceptedWt += d.acceptedWt;
-                acc.rejectedWt += d.rejectedWt;
-                return acc;
-            }, { totalWt: 0, acceptedWt: 0, rejectedWt: 0 });
-
-            const rejPct = totals.totalWt > 0 ? ((totals.rejectedWt / totals.totalWt) * 100).toFixed(2) : '0.00';
-            const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
-
-            const tr = document.createElement('tr');
-            if (typeIdx === 0) tr.classList.add('group-start');
-            else tr.classList.add('summary-sub');
-            tr.classList.add('type-row');
-
-            tr.innerHTML = `
-        <td>${typeIdx === 0 ? srNo : ''}</td>
-        <td>${typeIdx === 0 ? supervisor : ''}</td>
-        <td>${type.label}</td>
-        <td>${totals.totalWt.toFixed(1)}</td>
-        <td>${totals.acceptedWt.toFixed(1)}</td>
-        <td>${totals.rejectedWt.toFixed(1)}</td>
-        <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated on Weight (Kg.)">${rejPct}%</span></td>
-      `;
-            tbody.appendChild(tr);
-        });
-        srNo++;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${srNo++}</td>
+            <td><strong>${group.supervisor}</strong></td>
+            <td>${group.totalPipes}</td>
+            <td>${group.accepted}</td>
+            <td>${group.rejected}</td>
+            <td>${group.totalWt.toFixed(1)}</td>
+            <td>${group.acceptedWt.toFixed(1)}</td>
+            <td>${group.rejectedWt.toFixed(1)}</td>
+            <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated on Quantity (Nos.)">${rejPct}%</span></td>
+        `;
+        tbody.appendChild(tr);
     });
+
+    // Update count badge
+    const badge = document.getElementById('prodReportCount');
+    if (badge) badge.textContent = `${Object.keys(supGroups).length} supervisors · ${data.length} rows`;
 }
 
 // ============ QUALITY REPORT TABLE ============
