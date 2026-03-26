@@ -252,14 +252,14 @@ function transformReportData(rawData) {
         if (!rawQcDate && rawDate) rawQcDate = rawDate;
 
         return {
-            sourceRows: [row['Related ID'] || (idx + 2)], // Use Related ID if present, else fallback to Sheet row number
+            sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)], // Use ID or Related ID if present, else fallback to Sheet row number
             dateShift: dateShift,
             date: rawDate,
             shift: shift,
             qcDate: rawQcDate,
             qcShift: qcShift,
-            supervisor: (row['Supervisor'] || row['Supervisor '] || '').trim(),
-            qcName: (row['Name'] || '').trim(),
+            supervisor: (row['Production Supervisor'] || row['Supervisor'] || row['Supervisor '] || '').trim(),
+            qcName: (row['QC Supervisor'] || row['Name'] || '').trim(),
             pipeSize: row['Pipe Size_Calculated'] || '',
             totalPipes,
             wtPerPipe,
