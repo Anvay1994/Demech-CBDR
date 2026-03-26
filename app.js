@@ -802,10 +802,35 @@ function renderProductionSummary() {
 function renderQualityReport() {
     const data = filteredData;
     const tbody = document.getElementById('qualReportBody');
+    const showTimeline = document.getElementById('toggleTimeline')?.checked !== false;
+    
+    // Update headers dynamically
+    const thead = document.querySelector('#section-quality .report-table thead');
+    if (thead) {
+        thead.innerHTML = `
+            <tr>
+                <th>Sr.No.</th>
+                <th>Date</th>
+                <th>Shift</th>
+                <th>QC Name</th>
+                <th>Prod Sup</th>
+                <th>Pipe Size</th>
+                <th>Trolley No.</th>
+                ${showTimeline ? '<th>Loading Date</th><th>Loading Time</th><th>QC Time</th><th>Hours Cycle</th>' : ''}
+                <th>Total Qty</th>
+                <th>Accept (Nos)</th>
+                <th>Reject (Nos)</th>
+                <th>Total Wt</th>
+                <th>Acc Wt</th>
+                <th>Rej Wt</th>
+                <th>Rej %</th>
+            </tr>`;
+    }
+
     tbody.innerHTML = '';
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" class="empty-state">No data available</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="${showTimeline ? 17 : 13}" class="empty-state">No data available</td></tr>`;
         return;
     }
 
@@ -841,7 +866,7 @@ function renderQualityReport() {
         return a.qcName.localeCompare(b.qcName);
     });
 
-    // Grand totals (calculate from data to avoid double-counting during unrolling)
+    // Grand totals
     const gtQty = data.reduce((s, r) => s + r.totalPipes, 0);
     const gtAcc = data.reduce((s, r) => s + r.accepted, 0);
     const gtRej = data.reduce((s, r) => s + r.rejected, 0);
@@ -851,7 +876,6 @@ function renderQualityReport() {
 
     let srNo = 1;
     sortedGroups.forEach(group => {
-        // Subtotals for this group
         let stQty = 0, stAcc = 0, stRej = 0, stTotalWt = 0, stAccWt = 0, stRejWt = 0;
 
         group.pipes.forEach((pipe, idx) => {
@@ -868,7 +892,6 @@ function renderQualityReport() {
             const rejPct = parseFloat(pipe.rejectedPct) || 0;
             const rateClass = rejPct > 30 ? 'danger' : rejPct > 15 ? 'warning' : 'good';
 
-            // Accumulate subtotals
             stQty += pipe.totalPipes;
             stAcc += pipe.accepted;
             stRej += pipe.rejected;
@@ -877,54 +900,50 @@ function renderQualityReport() {
             stRejWt += rejectedWt;
 
             tr.innerHTML = `
-        <td>${idx === 0 ? srNo : ''}</td>
-        <td>${idx === 0 ? formatDate(group.date) : ''}</td>
-        <td>${idx === 0 ? group.shift : ''}</td>
-        <td>${idx === 0 ? `<strong>${group.qcName}</strong>` : ''}</td>
-        <td>${pipe.supervisor}</td>
-        <td>${pipe.pipeSize}</td>
-        <td>${pipe.trolleyNo}</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td>${pipe.totalPipes}</td>
-        <td class="badge-accepted">${pipe.accepted}</td>
-        <td class="badge-rejected">${pipe.rejected}</td>
-        <td>${totalWt.toFixed(1)}</td>
-        <td>${acceptedWt.toFixed(1)}</td>
-        <td>${rejectedWt.toFixed(1)}</td>
-        <td><span class="badge-rate ${rateClass}" title="Calculated on Quantity (Nos.)">${pipe.rejectedPct}</span></td>
-      `;
+                <td>${idx === 0 ? srNo : ''}</td>
+                <td>${idx === 0 ? formatDate(group.date) : ''}</td>
+                <td>${idx === 0 ? group.shift : ''}</td>
+                <td>${idx === 0 ? `<strong>${group.qcName}</strong>` : ''}</td>
+                <td>${pipe.supervisor}</td>
+                <td>${pipe.pipeSize}</td>
+                <td>${pipe.trolleyNo}</td>
+                ${showTimeline ? '<td></td><td></td><td></td><td></td>' : ''}
+                <td>${pipe.totalPipes}</td>
+                <td class="badge-accepted">${pipe.accepted}</td>
+                <td class="badge-rejected">${pipe.rejected}</td>
+                <td>${totalWt.toFixed(1)}</td>
+                <td>${acceptedWt.toFixed(1)}</td>
+                <td>${rejectedWt.toFixed(1)}</td>
+                <td><span class="badge-rate ${rateClass}" title="Calculated on Quantity (Nos.)">${pipe.rejectedPct}</span></td>
+            `;
             tbody.appendChild(tr);
         });
 
-        // Subtotal row
         const stRejPct = stQty > 0 ? ((stRej / stQty) * 100).toFixed(1) : '0.0';
         const stRateClass = parseFloat(stRejPct) > 30 ? 'danger' : parseFloat(stRejPct) > 15 ? 'warning' : 'good';
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="6"></td>
-        <td><strong>Subtotal</strong></td>
-        <td><strong>${group.pipes[0].loadingDate}</strong></td>
-        <td><strong>${group.pipes[0].loadingTime}</strong></td>
-        <td><strong>${group.pipes[0].qcTime}</strong></td>
-        <td><strong>${group.pipes[0].hoursCycle}</strong></td>
-        <td><strong>${stQty}</strong></td>
-        <td><strong>${stAcc}</strong></td>
-        <td><strong>${stRej}</strong></td>
-        <td><strong>${stTotalWt.toFixed(1)}</strong></td>
-        <td><strong>${stAccWt.toFixed(1)}</strong></td>
-        <td><strong>${stRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${stRateClass}" title="Calculated on Quantity (Nos.)">${stRejPct}%</span></strong></td>
-      `;
+            <td colspan="6"></td>
+            <td><strong>Subtotal</strong></td>
+            ${showTimeline ? `
+                <td><strong>${group.pipes[0].loadingDate}</strong></td>
+                <td><strong>${group.pipes[0].loadingTime}</strong></td>
+                <td><strong>${group.pipes[0].qcTime}</strong></td>
+                <td><strong>${group.pipes[0].hoursCycle}</strong></td>
+            ` : ''}
+            <td><strong>${stQty}</strong></td>
+            <td><strong>${stAcc}</strong></td>
+            <td><strong>${stRej}</strong></td>
+            <td><strong>${stTotalWt.toFixed(1)}</strong></td>
+            <td><strong>${stAccWt.toFixed(1)}</strong></td>
+            <td><strong>${stRejWt.toFixed(1)}</strong></td>
+            <td><strong><span class="badge-rate ${stRateClass}" title="Calculated on Quantity (Nos.)">${stRejPct}%</span></strong></td>
+        `;
         tbody.appendChild(stRow);
-
         srNo++;
     });
 
-    // Grand Total row
     const gtRejPct = gtQty > 0 ? ((gtRej / gtQty) * 100).toFixed(1) : '0.0';
     const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
     const gtRow = document.createElement('tr');
@@ -932,7 +951,7 @@ function renderQualityReport() {
     gtRow.innerHTML = `
         <td colspan="6"></td>
         <td><strong>Grand Total</strong></td>
-        <td colspan="4"></td>
+        ${showTimeline ? '<td colspan="4"></td>' : ''}
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong>${gtRej}</strong></td>
@@ -940,7 +959,7 @@ function renderQualityReport() {
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
         <td><strong><span class="badge-rate ${gtRateClass}" title="Calculated on Quantity (Nos.)">${gtRejPct}%</span></strong></td>
-      `;
+    `;
     tbody.appendChild(gtRow);
 
     // Update count badge
