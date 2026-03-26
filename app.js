@@ -521,27 +521,33 @@ function applyFilters() {
     const dateTo = document.getElementById('filterDateTo')?.value;
     const shift = document.getElementById('filterShift')?.value;
     const supervisor = document.getElementById('filterSupervisor')?.value;
+    const qcSupervisor = document.getElementById('filterQCName')?.value;
     const pipeSize = document.getElementById('filterPipeSize')?.value;
     const trolley = document.getElementById('filterTrolley')?.value;
 
     filteredData = allData.filter(row => {
-        // Date filter — parse as local dates to avoid UTC shift
+        // Date filter
         if (dateFrom) {
             const rowDate = parseDate(row.date);
-            const parts = dateFrom.split('-'); // yyyy-mm-dd from input
+            const parts = dateFrom.split('-');
             const fromDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             if (rowDate && rowDate < fromDate) return false;
         }
         if (dateTo) {
             const rowDate = parseDate(row.date);
-            const parts = dateTo.split('-'); // yyyy-mm-dd from input
+            const parts = dateTo.split('-');
             const toDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
             if (rowDate && rowDate > toDate) return false;
         }
         // Shift filter
         if (shift && shift !== 'all' && row.shift !== shift) return false;
-        // Supervisor filter
+        // Production Supervisor filter
         if (supervisor && supervisor !== 'all' && row.supervisor !== supervisor) return false;
+        // Quality Supervisor filter (check if name is in comma-separated list)
+        if (qcSupervisor && qcSupervisor !== 'all') {
+            const names = (row.qcName || '').split(',').map(n => n.trim());
+            if (!names.includes(qcSupervisor)) return false;
+        }
         // Pipe Size filter
         if (pipeSize && pipeSize !== 'all' && row.pipeSize !== pipeSize) return false;
         // Trolley filter
@@ -554,12 +560,14 @@ function applyFilters() {
 }
 
 function resetFilters() {
-    document.getElementById('filterDateFrom').value = '';
-    document.getElementById('filterDateTo').value = '';
-    document.getElementById('filterShift').value = 'all';
-    document.getElementById('filterSupervisor').value = 'all';
-    document.getElementById('filterPipeSize').value = 'all';
-    document.getElementById('filterTrolley').value = 'all';
+    if (document.getElementById('filterDateFrom')) document.getElementById('filterDateFrom').value = '';
+    if (document.getElementById('filterDateTo')) document.getElementById('filterDateTo').value = '';
+    if (document.getElementById('filterShift')) document.getElementById('filterShift').value = 'all';
+    if (document.getElementById('filterSupervisor')) document.getElementById('filterSupervisor').value = 'all';
+    if (document.getElementById('filterQCName')) document.getElementById('filterQCName').value = 'all';
+    if (document.getElementById('filterPipeSize')) document.getElementById('filterPipeSize').value = 'all';
+    if (document.getElementById('filterTrolley')) document.getElementById('filterTrolley').value = 'all';
+    
     filteredData = [...allData];
     renderAll();
 }
@@ -568,20 +576,42 @@ function populateFilterOptions() {
     const supervisors = [...new Set(allData.map(r => r.supervisor))].sort();
     const pipeSizes = [...new Set(allData.map(r => r.pipeSize))].filter(Boolean).sort();
     const trolleys = [...new Set(allData.map(r => r.trolleyNo))].filter(Boolean).sort();
+    
+    // Collect all unique QC names (handling comma separation)
+    const qcSet = new Set();
+    allData.forEach(r => {
+        (r.qcName || '').split(',').forEach(n => {
+            const name = n.trim();
+            if (name && name !== '—') qcSet.add(name);
+        });
+    });
+    const qcSupervisors = [...qcSet].sort();
 
     const supSelect = document.getElementById('filterSupervisor');
+    const qcSelect = document.getElementById('filterQCName');
     const psSelect = document.getElementById('filterPipeSize');
     const trolSelect = document.getElementById('filterTrolley');
 
-    supSelect.innerHTML = '<option value="all">All Supervisors</option>';
-    supervisors.forEach(s => {
-        supSelect.innerHTML += `<option value="${s}">${s}</option>`;
-    });
+    if (supSelect) {
+        supSelect.innerHTML = '<option value="all">All Supervisors</option>';
+        supervisors.forEach(s => {
+            supSelect.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+    }
 
-    psSelect.innerHTML = '<option value="all">All Sizes</option>';
-    pipeSizes.forEach(ps => {
-        psSelect.innerHTML += `<option value="${ps}">${ps}</option>`;
-    });
+    if (qcSelect) {
+        qcSelect.innerHTML = '<option value="all">All Supervisors</option>';
+        qcSupervisors.forEach(q => {
+            qcSelect.innerHTML += `<option value="${q}">${q}</option>`;
+        });
+    }
+
+    if (psSelect) {
+        psSelect.innerHTML = '<option value="all">All Sizes</option>';
+        pipeSizes.forEach(ps => {
+            psSelect.innerHTML += `<option value="${ps}">${ps}</option>`;
+        });
+    }
 
     if (trolSelect) {
         trolSelect.innerHTML = '<option value="all">All Trolleys</option>';
