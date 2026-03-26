@@ -281,10 +281,13 @@ function transformReportData(rawData) {
             qcShift: qcShift,
             supervisor: supervisor,
             qcName: qcName,
-            loadingDate: getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date ']),
-            loadingTime: getField(row, ['loading time'], ['Loading Time', 'Loading time']),
-            qcTime: getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time ']),
-            hoursCycle: getField(row, ['hour cycle', 'hours cycle'], ['Hour Cycle', 'Hours Cycle', 'Hour Cycle ', 'Hour_Cycle']),
+            supervisor: supervisor,
+            qcName: qcName,
+            loadingDate: formatDate(getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date '])),
+            loadingTime: formatTime(getField(row, ['loading time'], ['Loading Time', 'Loading time'])),
+            qcTime: formatTime(getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time '])),
+            hoursCycle: formatTime(getField(row, ['hour cycle', 'hours cycle'], ['Hour Cycle', 'Hours Cycle', 'Hour Cycle ', 'Hour_Cycle'])),
+            pipeSize: row['Pipe Size_Calculated'] || '',
             pipeSize: row['Pipe Size_Calculated'] || '',
             trolleyNo: trolleyNo,
             prodRej: parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0,
@@ -392,7 +395,19 @@ function parseDate(dateStr) {
 function formatDate(dateStr) {
     const d = parseDate(dateStr);
     if (!d || isNaN(d.getTime())) return dateStr;
+    // If it's the 1899 epoch (time-only), don't show it as a date
+    if (d.getFullYear() < 1910) return ''; 
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatTime(timeStr) {
+    if (!timeStr) return '';
+    const s = String(timeStr).trim();
+    if (s.includes('T')) {
+        const timePart = s.split('T')[1];
+        if (timePart) return timePart.split('.')[0];
+    }
+    return s;
 }
 
 function getMonthKey(dateStr) {
