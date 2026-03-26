@@ -884,10 +884,10 @@ function renderQualityReport() {
         <td>${pipe.supervisor}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.trolleyNo}</td>
-        <td>${pipe.loadingDate}</td>
-        <td>${pipe.loadingTime}</td>
-        <td>${pipe.qcTime}</td>
-        <td>${pipe.hoursCycle}</td>
+        <td></td>
+        <td></td>
+        <td></td>
+        <td></td>
         <td>${pipe.totalPipes}</td>
         <td class="badge-accepted">${pipe.accepted}</td>
         <td class="badge-rejected">${pipe.rejected}</td>
@@ -905,8 +905,12 @@ function renderQualityReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="10"></td>
+        <td colspan="6"></td>
         <td><strong>Subtotal</strong></td>
+        <td><strong>${group.pipes[0].loadingDate}</strong></td>
+        <td><strong>${group.pipes[0].loadingTime}</strong></td>
+        <td><strong>${group.pipes[0].qcTime}</strong></td>
+        <td><strong>${group.pipes[0].hoursCycle}</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
         <td><strong>${stRej}</strong></td>
@@ -926,8 +930,9 @@ function renderQualityReport() {
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="10"></td>
+        <td colspan="6"></td>
         <td><strong>Grand Total</strong></td>
+        <td colspan="4"></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong>${gtRej}</strong></td>
