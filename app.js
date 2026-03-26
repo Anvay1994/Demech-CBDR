@@ -995,7 +995,7 @@ function renderQualityReport() {
                 ${showTimeline ? '<td></td><td></td><td></td><td></td>' : ''}
                 <td>${pipe.totalPipes}</td>
                 <td class="badge-accepted">${pipe.accepted}</td>
-                <td class="badge-rejected" title="${getRejectionTooltip(pipe)}">${pipe.rejected}</td>
+                <td class="badge-rejected" data-tooltip="${getRejectionTooltip(pipe)}">${pipe.rejected}</td>
                 <td>${totalWt.toFixed(1)}</td>
                 <td>${acceptedWt.toFixed(1)}</td>
                 <td>${rejectedWt.toFixed(1)}</td>
@@ -1019,7 +1019,7 @@ function renderQualityReport() {
             ` : ''}
             <td><strong>${stQty}</strong></td>
             <td><strong>${stAcc}</strong></td>
-            <td><strong class="badge-rejected" title="${getRejectionTooltip(stDefects)}">${stRej}</strong></td>
+            <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(stDefects)}">${stRej}</strong></td>
             <td><strong>${stTotalWt.toFixed(1)}</strong></td>
             <td><strong>${stAccWt.toFixed(1)}</strong></td>
             <td><strong>${stRejWt.toFixed(1)}</strong></td>
@@ -1112,7 +1112,7 @@ function renderQualitySummary() {
       <td><strong>${group.qcName}</strong></td>
       <td>${group.totalPipes}</td>
       <td>${group.accepted}</td>
-      <td><span class="badge-rejected" title="${getRejectionTooltip(group)}">${group.rejected}</span></td>
+      <td><span class="badge-rejected" data-tooltip="${getRejectionTooltip(group)}">${group.rejected}</span></td>
       <td>${group.totalWt.toFixed(1)}</td>
       <td>${group.acceptedWt.toFixed(1)}</td>
       <td>${group.rejectedWt.toFixed(1)}</td>
