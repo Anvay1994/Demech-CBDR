@@ -270,8 +270,7 @@ function transformReportData(rawData) {
 
         const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor', 'Supervisor ']);
         const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'Name', 'QC Name']);
-
-        const trolleyNo = (row['Trolley no'] || row['Trolley No'] || row['Trolley No.'] || '').trim();
+        const trolleyNo = getField(row, ['trolley'], ['Trolley no', 'Trolley No', 'Trolley No.']);
 
         return {
             sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)], // Use ID or Related ID if present, else fallback to Sheet row number
