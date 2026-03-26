@@ -281,6 +281,10 @@ function transformReportData(rawData) {
             qcShift: qcShift,
             supervisor: supervisor,
             qcName: qcName,
+            loadingDate: row['Input Date'] || '',
+            loadingTime: row['Loading Time'] || '',
+            qcTime: row['QC Time'] || '',
+            hoursCycle: row['Hour Cycle'] || row['Hour_Cycle'] || '',
             pipeSize: row['Pipe Size_Calculated'] || '',
             trolleyNo: trolleyNo,
             prodRej: parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0,
@@ -830,6 +834,10 @@ function renderQualityReport() {
         <td>${pipe.supervisor}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.trolleyNo}</td>
+        <td>${pipe.loadingDate}</td>
+        <td>${pipe.loadingTime}</td>
+        <td>${pipe.qcTime}</td>
+        <td>${pipe.hoursCycle}</td>
         <td>${pipe.totalPipes}</td>
         <td class="badge-accepted">${pipe.accepted}</td>
         <td class="badge-rejected">${pipe.rejected}</td>
@@ -847,7 +855,7 @@ function renderQualityReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="6"></td>
+        <td colspan="10"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
@@ -868,7 +876,7 @@ function renderQualityReport() {
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="6"></td>
+        <td colspan="10"></td>
         <td><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
