@@ -251,6 +251,26 @@ function transformReportData(rawData) {
         // Fallback to input date if qc date is missing but qc shift exists
         if (!rawQcDate && rawDate) rawQcDate = rawDate;
 
+        // Robust mapping: try exact match, then any key containing the keyword
+        const getField = (row, keywords, exactFavors) => {
+            // 1. Try exact matches from a preferred list
+            for (const key of exactFavors) {
+                if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
+            }
+            // 2. Try any key containing keywords
+            const allKeys = Object.keys(row);
+            for (const key of allKeys) {
+                const lowerKey = key.toLowerCase();
+                if (keywords.some(k => lowerKey.includes(k))) {
+                    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
+                }
+            }
+            return '';
+        };
+
+        const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor', 'Supervisor ']);
+        const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'Name', 'QC Name']);
+
         return {
             sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)], // Use ID or Related ID if present, else fallback to Sheet row number
             dateShift: dateShift,
@@ -258,8 +278,8 @@ function transformReportData(rawData) {
             shift: shift,
             qcDate: rawQcDate,
             qcShift: qcShift,
-            supervisor: (row['Production Supervisor'] || row['Supervisor'] || row['Supervisor '] || '').trim(),
-            qcName: (row['QC Supervisor'] || row['Name'] || '').trim(),
+            supervisor: supervisor,
+            qcName: qcName,
             pipeSize: row['Pipe Size_Calculated'] || '',
             totalPipes,
             wtPerPipe,
