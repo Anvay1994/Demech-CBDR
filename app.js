@@ -596,7 +596,7 @@ function renderProductionReport() {
         <td>${totalWt.toFixed(1)}</td>
         <td>${acceptedWt.toFixed(1)}</td>
         <td>${rejectedWt.toFixed(1)}</td>
-        <td><span class="badge-rate ${rateClass}">${pipe.rejectedPct}</span></td>
+        <td><span class="badge-rate ${rateClass}" title="Calculated on Quantity (Nos.)">${pipe.rejectedPct}</span></td>
       `;
             tbody.appendChild(tr);
         });
@@ -618,7 +618,7 @@ function renderProductionReport() {
         <td><strong>${stTotalWt.toFixed(1)}</strong></td>
         <td><strong>${stAccWt.toFixed(1)}</strong></td>
         <td><strong>${stRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${stRateClass}">${stRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${stRateClass}" title="Calculated on Quantity (Nos.)">${stRejPct}%</span></strong></td>
       `;
         tbody.appendChild(stRow);
 
@@ -655,7 +655,7 @@ function renderProductionReport() {
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${gtRejPct}%">${gtRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${gtRejPct}%" title="Calculated on Quantity (Nos.)">${gtRejPct}%</span></strong></td>
       `;
     tbody.appendChild(gtRow);
 
@@ -736,7 +736,7 @@ function renderProductionSummary() {
         <td>${totals.totalWt.toFixed(1)}</td>
         <td>${totals.acceptedWt.toFixed(1)}</td>
         <td>${totals.rejectedWt.toFixed(1)}</td>
-        <td><span class="badge-rate ${rateClass}">${rejPct}%</span></td>
+        <td><span class="badge-rate ${rateClass}" title="Calculated on Weight (Kg.)">${rejPct}%</span></td>
       `;
             tbody.appendChild(tr);
         });
@@ -836,7 +836,7 @@ function renderQualityReport() {
         <td>${totalWt.toFixed(1)}</td>
         <td>${acceptedWt.toFixed(1)}</td>
         <td>${rejectedWt.toFixed(1)}</td>
-        <td><span class="badge-rate ${rateClass}">${pipe.rejectedPct}</span></td>
+        <td><span class="badge-rate ${rateClass}" title="Calculated on Quantity (Nos.)">${pipe.rejectedPct}</span></td>
       `;
             tbody.appendChild(tr);
         });
@@ -855,7 +855,7 @@ function renderQualityReport() {
         <td><strong>${stTotalWt.toFixed(1)}</strong></td>
         <td><strong>${stAccWt.toFixed(1)}</strong></td>
         <td><strong>${stRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${stRateClass}">${stRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${stRateClass}" title="Calculated on Quantity (Nos.)">${stRejPct}%</span></strong></td>
       `;
         tbody.appendChild(stRow);
 
@@ -876,7 +876,7 @@ function renderQualityReport() {
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${gtRateClass}">${gtRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${gtRateClass}" title="Calculated on Quantity (Nos.)">${gtRejPct}%</span></strong></td>
       `;
     tbody.appendChild(gtRow);
 
@@ -943,7 +943,7 @@ function renderQualitySummary() {
       <td>${group.totalWt.toFixed(1)}</td>
       <td>${group.acceptedWt.toFixed(1)}</td>
       <td>${group.rejectedWt.toFixed(1)}</td>
-      <td><span class="badge-rate ${rateClass}">${rejPct}%</span></td>
+      <td><span class="badge-rate ${rateClass}" title="Calculated on Weight (Kg.)">${rejPct}%</span></td>
     `;
         tbody.appendChild(tr);
         srNo++;
