@@ -283,6 +283,8 @@ function transformReportData(rawData) {
             qcName: qcName,
             pipeSize: row['Pipe Size_Calculated'] || '',
             trolleyNo: trolleyNo,
+            prodRej: parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0,
+            prodRejWt: (parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0) * wtPerPipe,
             totalPipes,
             wtPerPipe,
             totalWt,
@@ -315,6 +317,8 @@ function transformReportData(rawData) {
                 qcNames: new Set(),
                 pipeSize: r.pipeSize,
                 trolleyNo: r.trolleyNo,
+                prodRej: 0,
+                prodRejWt: 0,
                 totalPipes: 0,
                 wtPerPipe: r.wtPerPipe,
                 totalWt: 0,
@@ -332,6 +336,8 @@ function transformReportData(rawData) {
         const a = aggMap[key];
         a.sourceRows.push(...r.sourceRows);
         if (r.qcName) a.qcNames.add(r.qcName);
+        a.prodRej += r.prodRej;
+        a.prodRejWt += r.prodRejWt;
         a.totalPipes += r.totalPipes;
         a.totalWt += r.totalWt;
         a.accepted += r.accepted;
@@ -574,6 +580,8 @@ function renderProductionReport() {
 
             tr.innerHTML = `
         <td>${idx === 0 ? srNo : ''}</td>
+        <td class="col-bl">${pipe.prodRej}</td>
+        <td class="col-bl">${pipe.prodRejWt.toFixed(1)}</td>
         <td>${idx === 0 ? formatDate(group.date) : ''}</td>
         <td>${idx === 0 ? group.shift : ''}</td>
         <td>${idx === 0 ? group.supervisor : ''}</td>
@@ -596,7 +604,7 @@ function renderProductionReport() {
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
-        <td colspan="6"></td>
+        <td colspan="8"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
@@ -625,7 +633,7 @@ function renderProductionReport() {
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="6"></td>
+        <td colspan="8"></td>
         <td><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>

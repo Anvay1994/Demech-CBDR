@@ -41,6 +41,13 @@
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.col-bl { 
+  background-color: rgba(244, 162, 97, 0.08) !important; 
+  color: #f4a261 !important; 
+  font-weight: 500;
+}
+
+
 /* --- Reset & Base --- */
 *,
 *::before,
@@ -781,9 +788,9 @@ body::before {
 
 /* Sub-row (pipe sizes under same supervisor) for Production Report */
 .report-table tbody tr.sub-row.prod-sub-row td:first-child,
-.report-table tbody tr.sub-row.prod-sub-row td:nth-child(2),
-.report-table tbody tr.sub-row.prod-sub-row td:nth-child(3),
-.report-table tbody tr.sub-row.prod-sub-row td:nth-child(4) {
+.report-table tbody tr.sub-row.prod-sub-row td:nth-child(4),
+.report-table tbody tr.sub-row.prod-sub-row td:nth-child(5),
+.report-table tbody tr.sub-row.prod-sub-row td:nth-child(6) {
   color: transparent;
 }
 
