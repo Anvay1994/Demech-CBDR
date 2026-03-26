@@ -555,6 +555,7 @@ function renderProductionReport() {
     Object.values(groups).forEach(group => {
         // Subtotals for this group
         let stQty = 0, stAcc = 0, stRej = 0, stTotalWt = 0, stAccWt = 0, stRejWt = 0;
+        let stProdRej = 0, stProdRejWt = 0;
 
         group.pipes.forEach((pipe, idx) => {
             const tr = document.createElement('tr');
@@ -577,6 +578,8 @@ function renderProductionReport() {
             stTotalWt += totalWt;
             stAccWt += acceptedWt;
             stRejWt += rejectedWt;
+            stProdRej += pipe.prodRej;
+            stProdRejWt += pipe.prodRejWt;
 
             tr.innerHTML = `
         <td>${idx === 0 ? srNo : ''}</td>
@@ -605,8 +608,8 @@ function renderProductionReport() {
         stRow.classList.add('subtotal-row');
         stRow.innerHTML = `
         <td></td>
-        <td class="col-bl"><strong>${a.prodRej}</strong></td>
-        <td class="col-bl"><strong>${a.prodRejWt.toFixed(1)}</strong></td>
+        <td class="col-bl"><strong>${stProdRej}</strong></td>
+        <td class="col-bl"><strong>${stProdRejWt.toFixed(1)}</strong></td>
         <td colspan="5"></td>
         <td><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
