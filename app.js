@@ -284,9 +284,9 @@ function transformReportData(rawData) {
             supervisor: supervisor,
             qcName: qcName,
             loadingDate: formatDate(getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date '])),
-            loadingTime: formatTime(getField(row, ['loading time'], ['Loading Time', 'Loading time'])),
-            qcTime: formatTime(getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time '])),
-            hoursCycle: formatTime(getField(row, ['hour cycle', 'hours cycle'], ['Hour Cycle', 'Hours Cycle', 'Hour Cycle ', 'Hour_Cycle'])),
+            loadingTime: formatTimeLocal(getField(row, ['loading time'], ['Loading Time', 'Loading time'])),
+            qcTime: formatTimeLocal(getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time '])),
+            hoursCycle: formatDuration(getField(row, ['hour cycle', 'hours cycle'], ['Hour Cycle', 'Hours Cycle', 'Hour Cycle ', 'Hour_Cycle'])),
             pipeSize: row['Pipe Size_Calculated'] || '',
             pipeSize: row['Pipe Size_Calculated'] || '',
             trolleyNo: trolleyNo,
@@ -396,18 +396,49 @@ function formatDate(dateStr) {
     const d = parseDate(dateStr);
     if (!d || isNaN(d.getTime())) return dateStr;
     // If it's the 1899 epoch (time-only), don't show it as a date
-    if (d.getFullYear() < 1910) return ''; 
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (d.getFullYear() < 1920) return '';
+    
+    return d.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    }).replace(/ /g, '-');
 }
 
-function formatTime(timeStr) {
+function formatTimeLocal(timeStr) {
     if (!timeStr) return '';
-    const s = String(timeStr).trim();
-    if (s.includes('T')) {
-        const timePart = s.split('T')[1];
-        if (timePart) return timePart.split('.')[0];
-    }
-    return s;
+    const d = new Date(timeStr);
+    if (isNaN(d.getTime())) return timeStr;
+    // If timeStr doesn't look like an ISO date, just return it
+    if (!String(timeStr).includes('T')) return timeStr;
+    
+    // Convert to India time (or browser local)
+    return d.toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+
+function formatDuration(val) {
+    if (!val) return '';
+    const d = new Date(val);
+    if (isNaN(d.getTime()) || !String(val).includes('T')) return val;
+    
+    // Google Sheets uses 1899-12-30 00:00:00 as the base for DURATIONS
+    // but sometimes the API returns it with a timezone offset.
+    // We calculate the difference from 1899-12-30T00:00:00Z (UTC)
+    const base = new Date('1899-12-30T00:00:00.000Z');
+    const diffMs = d.getTime() - base.getTime();
+    
+    const totalSeconds = Math.round(diffMs / 1000);
+    const absSeconds = Math.abs(totalSeconds);
+    const hours = Math.floor(absSeconds / 3600);
+    const minutes = Math.floor((absSeconds % 3600) / 60);
+    const seconds = absSeconds % 60;
+    
+    return `${totalSeconds < 0 ? '-' : ''}${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 function getMonthKey(dateStr) {
