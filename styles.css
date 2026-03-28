@@ -347,6 +347,85 @@ body::before {
   letter-spacing: 0.02em;
 }
 
+/* Custom Checkbox */
+.form-options {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 28px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  user-select: none;
+  transition: var(--transition);
+}
+
+.checkbox-container:hover {
+  color: var(--text-primary);
+}
+
+.checkbox-container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: absolute;
+  left: 0;
+  height: 18px;
+  width: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.checkbox-container:hover input ~ .checkmark {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.checkbox-container input:checked ~ .checkmark {
+  background: var(--accent-orange);
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 10px var(--accent-orange-glow);
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.checkbox-container .checkmark:after {
+  left: 6px;
+  top: 2px;
+  width: 4px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-label {
+  margin-bottom: 0;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
 .btn-secondary {
   background: var(--bg-glass);
   border: 1px solid var(--border-glass);
@@ -369,6 +448,36 @@ body::before {
   text-align: center;
   margin-top: 1rem;
   display: none;
+}
+
+.login-status-msg {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+  margin-top: 1.5rem;
+  transition: var(--transition);
+}
+
+.login-status-msg.loading {
+  color: var(--accent-amber);
+}
+
+.login-status-msg.loading::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+.g_id_signin {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
 }
 
 .login-error.show {
@@ -495,6 +604,37 @@ body::before {
 
 .btn-logout:hover {
   background: rgba(230, 57, 70, 0.25);
+}
+
+/* User Profile in Nav */
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-right: 1rem;
+  margin-right: 1rem;
+  border-right: 1px solid var(--border-glass);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.user-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.user-role {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--accent-orange);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* --- Page Tabs --- */

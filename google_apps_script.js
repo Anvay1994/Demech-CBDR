@@ -32,12 +32,53 @@ function doGet(e) {
             return JSON_RESPONSE({ error: 'Unauthorized: Invalid token' });
         }
 
+        var action = e.parameter.action || 'read';
         var sheetName = e.parameter.sheet || 'Report Format';
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         if (!ss) {
             return JSON_RESPONSE({ error: 'Spreadsheet not found or script not bound correctly' });
         }
 
+        // --- NEW: USER VERIFICATION ACTION ---
+        if (action === 'verify') {
+            var emailToVerify = (e.parameter.email || '').toLowerCase().trim();
+            if (!emailToVerify) return JSON_RESPONSE({ error: 'Email required for verification' });
+
+            var userSheet = ss.getSheetByName('Users');
+            if (!userSheet) return JSON_RESPONSE({ error: 'Users whitelist sheet not found' });
+
+            var userData = userSheet.getDataRange().getValues();
+            var headers = userData[0];
+            var emailIdx = -1, nameIdx = -1, roleIdx = -1;
+
+            // Find column indices
+            for (var j = 0; j < headers.length; j++) {
+                var h = String(headers[j]).toLowerCase();
+                if (h.includes('email')) emailIdx = j;
+                if (h.includes('name')) nameIdx = j;
+                if (h.includes('role')) roleIdx = j;
+            }
+
+            if (emailIdx === -1) return JSON_RESPONSE({ error: 'Email Id column not found in Users sheet' });
+
+            for (var i = 1; i < userData.length; i++) {
+                var rowEmail = String(userData[i][emailIdx]).toLowerCase().trim();
+                if (rowEmail === emailToVerify) {
+                    return JSON_RESPONSE({
+                        success: true,
+                        user: {
+                            email: rowEmail,
+                            name: nameIdx !== -1 ? userData[i][nameIdx] : '',
+                            role: roleIdx !== -1 ? userData[i][roleIdx] : ''
+                        }
+                    });
+                }
+            }
+
+            return JSON_RESPONSE({ success: false, error: 'User not authorized (not in whitelist)' });
+        }
+
+        // --- EXISTING: DATA READING LOGIC ---
         var sheet = ss.getSheetByName(sheetName);
         if (!sheet) {
             return JSON_RESPONSE({ error: 'Sheet not found: ' + sheetName });

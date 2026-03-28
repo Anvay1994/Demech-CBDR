@@ -8,7 +8,7 @@
 // 1. Deploy the Google Apps Script (see google_apps_script.js)
 // 2. Paste the Web App URL below
 // 3. The sheet data stays PRIVATE — only the script can read it
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwZsyLRr3OaYV1NHDJz7gTTId87JHzNauyzQR8S3kWo7l3EuufFt5gnjIaP7-_Qt1qz/exec'; // ← PASTE YOUR WEB APP URL HERE
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxUC0_sZqQhpMP1wJk1AOu1gMRe11Nv9r1-e7CgyAyLdT_xJz_PkK2wO-iJS3J3uPNH/exec'; // ← PASTE YOUR WEB APP URL HERE
 const API_TOKEN = 'demech_secure_2025'; // Must match the token in google_apps_script.js
 
 const SHEETS = {
@@ -25,15 +25,31 @@ let currentTab = 'dashboard';
 
 // ============ AUTH CHECK ============
 function checkAuth() {
-    if (sessionStorage.getItem('demech_auth') !== 'true') {
+    const isAuth = sessionStorage.getItem('demech_auth') === 'true' || localStorage.getItem('demech_auth') === 'true';
+    if (!isAuth) {
         window.location.href = 'index.html';
         return false;
     }
+    
+    // Display user profile if available
+    const name = sessionStorage.getItem('demech_user_name') || localStorage.getItem('demech_user_name');
+    const role = sessionStorage.getItem('demech_user_role') || localStorage.getItem('demech_user_role');
+    const profileEl = document.getElementById('userProfile');
+    if (profileEl && name) {
+        document.getElementById('userName').textContent = name;
+        document.getElementById('userRole').textContent = role || 'User';
+        profileEl.style.display = 'flex';
+    }
+    
     return true;
 }
 
 function logout() {
     sessionStorage.clear();
+    localStorage.removeItem('demech_auth');
+    localStorage.removeItem('demech_user_email');
+    localStorage.removeItem('demech_user_name');
+    localStorage.removeItem('demech_user_role');
     window.location.href = 'index.html';
 }
 
