@@ -151,10 +151,9 @@ function doGet(e) {
             for (var j = 0; j < hds.length; j++) {
                 var k = String(hds[j]).trim();
                 var v = data[i][j];
-                // Dashboard also needs Force IST logic for reading
+                // Spreadsheet is already IST — just format directly
                 if (v instanceof Date) {
-                  var istV = new Date(v.getTime() + (5.5 * 60 * 60 * 1000));
-                  v = Utilities.formatDate(istV, "GMT", 'dd-MM-yyyy');
+                  v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd-MM-yyyy');
                 }
                 obj[k] = v;
                 if (v !== '' && v !== 0 && v !== null) hasVal = true;

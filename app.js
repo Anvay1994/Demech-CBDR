@@ -228,15 +228,17 @@ function transformReportData(rawData) {
             }
         }
 
-        const totalPipes = parseInt(row['Prod Qty']) || parseInt(row['Total Pipe Number']) || 0;
-        const accepted = parseInt(row['Accepted Pipes']) || 0;
-        const rejected = parseInt(row['Rejected Pipes']) || 0;
-        const wtPerPipe = parseFloat(row['WT']) || parseFloat(row['WT Per Pipe']) || 0;
-        const totalWt = parseFloat(row['Prod wt']) || parseFloat(row['Total WT Pipes (KG)']) || 0;
-        const acceptedWt = parseFloat(row['Accepted Wt']) || 0;
+        const totalPipes = parseInt(getField(row, ['prod qty', 'total pipe', 'total nos', 'total qty'], ['Prod Qty', 'Total Pipe Number', 'Total (Nos)'])) || 0;
+        const accepted = parseInt(getField(row, ['accepted pipes', 'accepted (nos)', 'accept'], ['Accepted Pipes', 'Accepted (Nos)', 'Accept (Nos)'])) || 0;
+        const rejected = parseInt(getField(row, ['rejected pipes', 'rejected (nos)', 'reject'], ['Rejected Pipes', 'Rejected (Nos)', 'Reject (Nos)'])) || 0;
+        
+        const wtPerPipe = parseFloat(getField(row, ['wt', 'wt per pipe'], ['WT', 'WT Per Pipe'])) || 0;
+        const totalWt = parseFloat(getField(row, ['prod wt', 'total wt'], ['Prod wt', 'Total WT Pipes (KG)', 'Total Wt'])) || 0;
+        const acceptedWt = parseFloat(getField(row, ['accepted wt', 'acc wt'], ['Accepted Wt', 'Acc. Wt (Kg.)', 'Acc Wt'])) || 0;
 
         // Calculate rejected weight
-        const rejectedWt = row['Rejected Wt'] !== undefined ? parseFloat(row['Rejected Wt']) : (totalWt - acceptedWt);
+        const rawRejectedWt = getField(row, ['rejected wt', 'rej wt'], ['Rejected Wt', 'Rej. Wt (Kg.)', 'Rej Wt']);
+        const rejectedWt = rawRejectedWt !== "" ? parseFloat(rawRejectedWt) : (totalWt - acceptedWt);
 
         let qcShift = '';
         const rawQcShift = (row['Shift'] || '').trim().toLowerCase();
@@ -329,7 +331,7 @@ function transformReportData(rawData) {
             acceptedWt,
             rejectedWt: Math.abs(rejectedWt)
         };
-    }).filter(r => r.totalPipes > 0);
+    }).filter(r => (r.date && r.date !== "") || (r.totalPipes > 0) || (r.qcName && r.qcName !== ""));
 
     // Aggregate by date + shift + qcDate + qcShift + supervisor + pipeSize so each pipe size is unique per group
     const aggMap = {};
@@ -711,6 +713,9 @@ function renderProductionReport() {
         if (a.shift !== b.shift) return a.shift.localeCompare(b.shift);
         return a.supervisor.localeCompare(b.supervisor);
     });
+
+    // Grand totals
+    let gtQty = 0, gtAcc = 0, gtRej = 0, gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
 
     let srNo = 1;
     sortedGroups.forEach(group => {
