@@ -703,11 +703,17 @@ function renderProductionReport() {
         groups[key].pipes.push(row);
     });
 
-    // Grand totals
-    let gtQty = 0, gtAcc = 0, gtRej = 0, gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
+    // Sort groups: New to Old (Descending)
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+        const dateA = parseDate(a.date);
+        const dateB = parseDate(b.date);
+        if (dateA && dateB && dateA.getTime() !== dateB.getTime()) return dateB - dateA;
+        if (a.shift !== b.shift) return a.shift.localeCompare(b.shift);
+        return a.supervisor.localeCompare(b.supervisor);
+    });
 
     let srNo = 1;
-    Object.values(groups).forEach(group => {
+    sortedGroups.forEach(group => {
         // Subtotals for this group
         let stQty = 0, stAcc = 0, stRej = 0, stTotalWt = 0, stAccWt = 0, stRejWt = 0;
         let stProdRej = 0, stProdRejWt = 0;
@@ -932,11 +938,11 @@ function renderQualityReport() {
         });
     });
 
-    // Sort by Date, then Shift, then QC Name
+    // Sort by Date (New to Old), then Shift, then QC Name
     const sortedGroups = Object.values(groups).sort((a, b) => {
         const dateA = parseDate(a.date);
         const dateB = parseDate(b.date);
-        if (dateA && dateB && dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+        if (dateA && dateB && dateA.getTime() !== dateB.getTime()) return dateB - dateA; // Descending
         if (a.shift !== b.shift) return a.shift.localeCompare(b.shift);
         return a.qcName.localeCompare(b.qcName);
     });
@@ -2162,7 +2168,7 @@ async function initApp() {
     showLoading(false);
 }
 
-// Set default date range to last 7 days
+// Set default date range to last 7 days (capped at today)
 function setDefaultDateRange() {
     const dateFromEl = document.getElementById('filterDateFrom');
     const dateToEl = document.getElementById('filterDateTo');
@@ -2171,11 +2177,24 @@ function setDefaultDateRange() {
     // Only set defaults if user hasn't manually set filters
     if (dateFromEl.value || dateToEl.value) return;
 
-    // Find the latest date in data
-    const allDates = allData.map(r => parseDate(r.date)).filter(d => d && !isNaN(d.getTime()));
-    if (allDates.length === 0) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const maxDate = new Date(Math.max(...allDates));
+    // Find the latest date in data, but don't exceed today
+    let maxDate = today;
+    const allDates = allData.map(r => parseDate(r.date)).filter(d => d && !isNaN(d.getTime()));
+    
+    if (allDates.length > 0) {
+        const latestDataDate = new Date(Math.max(...allDates));
+        // If we have data today or in the past, use the latest data date
+        // But if the latest data is far in the future, cap it at today
+        if (latestDataDate <= today) {
+            maxDate = latestDataDate;
+        } else {
+            maxDate = today;
+        }
+    }
+
     const fromDate = new Date(maxDate);
     fromDate.setDate(fromDate.getDate() - 6); // 7 days including maxDate
 
