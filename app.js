@@ -8,7 +8,7 @@
 // 1. Deploy the Google Apps Script (see google_apps_script.js)
 // 2. Paste the Web App URL below
 // 3. The sheet data stays PRIVATE — only the script can read it
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxUC0_sZqQhpMP1wJk1AOu1gMRe11Nv9r1-e7CgyAyLdT_xJz_PkK2wO-iJS3J3uPNH/exec'; // ← PASTE YOUR WEB APP URL HERE
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycBv3wKUTBWb_x51LTAoI_uCm1cnKPOTucoijwxlswQLxKYPh4OoA3xlb4_OqWus4W/exec'; // ← PASTE YOUR WEB APP URL HERE
 const API_TOKEN = 'demech_secure_2025'; // Must match the token in google_apps_script.js
 
 const SHEETS = {
