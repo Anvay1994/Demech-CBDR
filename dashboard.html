@@ -42,6 +42,7 @@
         <!-- ========== PAGE TABS ========== -->
         <div class="page-tabs">
             <div class="page-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="page-tab" data-tab="daily" onclick="switchTab('daily')">📅 Daily Report</div>
             <div class="page-tab" data-tab="production" onclick="switchTab('production')">📋 Production Report</div>
             <div class="page-tab" data-tab="quality" onclick="switchTab('quality')">🔍 Quality Report</div>
             <div class="page-tab" data-tab="dataquality" onclick="switchTab('dataquality')">⚠ Data Quality <span
@@ -153,6 +154,39 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- ===================================================
+           SECTION: DAILY REPORT
+           =================================================== -->
+            <div id="section-daily" class="page-section">
+
+                <!-- Daily Report Header -->
+                <div class="section-header">
+                    <h3>📅 Shiftwise Production Logbook</h3>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button class="btn btn-secondary btn-sm" onclick="exportMonthlyCSV()">⬇ Monthly Summary (CSV)</button>
+                    </div>
+                </div>
+
+                <!-- Date Picker + Sub Tabs -->
+                <div class="daily-controls">
+                    <div class="daily-date-picker">
+                        <label>Select Date</label>
+                        <input type="date" id="dailyDatePicker" onchange="renderDailyReport()">
+                    </div>
+                    <div class="daily-sub-tabs">
+                        <button class="daily-sub-tab active" id="dailySubProd" onclick="switchDailySub('production')">🏭 Production</button>
+                        <button class="daily-sub-tab" id="dailySubQual" onclick="switchDailySub('quality')">🔍 Quality</button>
+                    </div>
+                </div>
+
+                <!-- Daily Content Area (filled by JS) -->
+                <div id="dailyContent"></div>
+
+                <!-- 24-Hour Summary (filled by JS) -->
+                <div id="daily24HrSummary"></div>
+
             </div>
 
             <!-- ===================================================
@@ -380,7 +414,7 @@
         </div><!-- end .main-content -->
     </div><!-- end .app-container -->
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
     <script>
         // Initialize the app on page load
         document.addEventListener('DOMContentLoaded', initApp);

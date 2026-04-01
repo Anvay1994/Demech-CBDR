@@ -12,16 +12,19 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycBv3wKUTBWb_x
 const API_TOKEN = 'demech_secure_2025'; // Must match the token in google_apps_script.js
 
 const SHEETS = {
-    report: 'Input Level Data', // Set to the raw Input Level Data sheet
+    report: 'Input Level Data',
     pipeMaster: 'Pipe Master',
-    main: 'Summary Sheet'
+    main: 'Summary Sheet',
+    shiftLevel: 'Shift Level Data'
 };
 
 // ============ STATE ============
 let allData = [];
 let pipeMasterData = [];
+let shiftLevelData = [];
 let filteredData = [];
 let currentTab = 'dashboard';
+let dailySubTab = 'production';
 
 // ============ AUTH CHECK ============
 function checkAuth() {
@@ -1726,6 +1729,8 @@ function renderAll() {
 
     if (currentTab === 'dashboard') {
         renderCharts();
+    } else if (currentTab === 'daily') {
+        renderDailyReport();
     } else if (currentTab === 'production') {
         renderProductionReport();
         renderProductionSummary();
@@ -1733,6 +1738,334 @@ function renderAll() {
         renderQualityReport();
         renderQualitySummary();
     }
+}
+
+// ============ DAILY REPORT ============
+function switchDailySub(sub) {
+    dailySubTab = sub;
+    document.querySelectorAll('.daily-sub-tab').forEach(b => b.classList.remove('active'));
+    document.getElementById(sub === 'production' ? 'dailySubProd' : 'dailySubQual')?.classList.add('active');
+    renderDailyReport();
+}
+
+function getDailyDate() {
+    const picker = document.getElementById('dailyDatePicker');
+    if (!picker) return null;
+    if (!picker.value) {
+        // Default to today
+        const now = new Date();
+        picker.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
+    // Convert YYYY-MM-DD to DD-MM-YYYY for matching
+    const parts = picker.value.split('-');
+    return { iso: picker.value, display: `${parts[2]}-${parts[1]}-${parts[0]}` };
+}
+
+function renderDailyReport() {
+    const dateInfo = getDailyDate();
+    if (!dateInfo) return;
+    const contentEl = document.getElementById('dailyContent');
+    const summaryEl = document.getElementById('daily24HrSummary');
+    if (!contentEl || !summaryEl) return;
+
+    if (dailySubTab === 'production') {
+        renderDailyProduction(dateInfo, contentEl);
+    } else {
+        renderDailyQuality(dateInfo, contentEl);
+    }
+    renderDaily24HrSummary(dateInfo, summaryEl);
+}
+
+function getShiftLabel(raw) {
+    const s = String(raw).toLowerCase().trim();
+    if (s === 'l' || s === 'i' || s === '1') return 'I';
+    if (s === 'll' || s === 'ii' || s === '2') return 'II';
+    if (s === 'lll' || s === 'iii' || s === '3') return 'III';
+    return s.toUpperCase();
+}
+
+function renderDailyProduction(dateInfo, container) {
+    // Filter production data for this date
+    const dayData = allData.filter(r => r.date === dateInfo.display);
+    // Filter shift level data for this date
+    const dayShiftData = shiftLevelData.filter(r => {
+        const d = String(r['Date'] || '').trim();
+        return d === dateInfo.display;
+    });
+
+    if (dayData.length === 0 && dayShiftData.length === 0) {
+        container.innerHTML = `<div class="daily-empty"><span class="empty-icon">📭</span>No production data for ${formatDate(dateInfo.display)}</div>`;
+        return;
+    }
+
+    // Group production data by shift
+    const shifts = { 'I': [], 'II': [], 'III': [] };
+    dayData.forEach(r => {
+        const s = r.shift || 'I';
+        if (shifts[s]) shifts[s].push(r);
+    });
+
+    let html = '';
+    ['I', 'II', 'III'].forEach(shiftName => {
+        const rows = shifts[shiftName];
+        // Find shift level composition for this shift
+        const shiftComp = dayShiftData.find(s => getShiftLabel(s['Shift']) === shiftName);
+        const supervisor = rows.length > 0 ? rows[0].supervisor : (shiftComp ? shiftComp['Supervisor'] : '—');
+
+        if (rows.length === 0 && !shiftComp) return; // Skip empty shifts
+
+        const badgeClass = shiftName === 'I' ? 'shift-i' : shiftName === 'II' ? 'shift-ii' : 'shift-iii';
+
+        // Aggregate by pipe size
+        const pipeSizeMap = {};
+        rows.forEach(r => {
+            const ps = r.pipeSize || '—';
+            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, wtPerPipe: r.wtPerPipe, qty: 0, totalWt: 0 };
+            pipeSizeMap[ps].qty += r.totalPipes;
+            pipeSizeMap[ps].totalWt += r.totalWt;
+        });
+        const pipeRows = Object.values(pipeSizeMap);
+        const totalQty = pipeRows.reduce((s, p) => s + p.qty, 0);
+        const totalWt = pipeRows.reduce((s, p) => s + p.totalWt, 0);
+
+        html += `<div class="shift-card">
+            <div class="shift-card-header">
+                <div class="shift-card-title">
+                    <div class="shift-badge ${badgeClass}">${shiftName}</div>
+                    <div>
+                        <h4>Shift ${shiftName}</h4>
+                        <span>${formatDate(dateInfo.display)} · ${supervisor || '—'}</span>
+                    </div>
+                </div>
+                <div class="shift-card-meta">
+                    <div>Pipes: <strong>${totalQty}</strong></div>
+                    <div>Weight: <strong>${totalWt.toFixed(1)} Kg</strong></div>
+                </div>
+            </div>
+            <div class="shift-card-body">`;
+
+        if (pipeRows.length > 0) {
+            html += `<table class="report-table" style="margin-bottom:0;">
+                <thead><tr>
+                    <th>Sr.</th><th>Pipe Size (ID×L)</th><th>Unit Wt (Kg)</th><th>Qty (Nos)</th><th>Total Wt (Kg)</th>
+                </tr></thead><tbody>`;
+            pipeRows.forEach((p, idx) => {
+                html += `<tr>
+                    <td>${idx+1}</td><td>${p.pipeSize}</td><td>${p.wtPerPipe}</td><td>${p.qty}</td><td>${p.totalWt.toFixed(1)}</td>
+                </tr>`;
+            });
+            html += `<tr class="subtotal-row">
+                <td colspan="3" style="text-align:right;"><strong>Shift Total</strong></td>
+                <td><strong>${totalQty}</strong></td><td><strong>${totalWt.toFixed(1)}</strong></td>
+            </tr></tbody></table>`;
+        } else {
+            html += `<div style="color:var(--text-muted);padding:0.5rem 0;">No pipe data for this shift</div>`;
+        }
+
+        // Composition from Shift Level Data
+        if (shiftComp) {
+            const batches = shiftComp['Number of batch'] || '—';
+            const l1 = shiftComp['L1_Composition'] || '—';
+            const l2 = shiftComp['L2_Composition'] || '—';
+            const rr = shiftComp['RR_Composition'] || '—';
+            const inputKgBS = shiftComp['Input KG_BS'] || '';
+            const inputKgL1 = shiftComp['Input KG_L1'] || '';
+            const inputKgL2 = shiftComp['Input KG_L2'] || '';
+            const inputKgRR = shiftComp['Input KG_RR'] || '';
+            const remark = shiftComp['Remark'] || '';
+
+            html += `<div class="composition-grid">
+                <div class="comp-item"><div class="comp-label">Batches (Stone)</div><div class="comp-value">${batches}</div><div class="comp-unit">${inputKgBS ? inputKgBS + ' Kg' : ''}</div></div>
+                <div class="comp-item"><div class="comp-label">L1 Composition</div><div class="comp-value">${l1}</div><div class="comp-unit">${inputKgL1 ? inputKgL1 + ' Kg' : ''}</div></div>
+                <div class="comp-item"><div class="comp-label">L2 Composition</div><div class="comp-value">${l2}</div><div class="comp-unit">${inputKgL2 ? inputKgL2 + ' Kg' : ''}</div></div>
+                <div class="comp-item"><div class="comp-label">RR (RJM+RTL)</div><div class="comp-value">${rr}</div><div class="comp-unit">${inputKgRR ? inputKgRR + ' Kg' : ''}</div></div>
+            </div>`;
+            if (remark) {
+                html += `<div style="margin-top:0.75rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border-radius:8px;border-left:3px solid var(--accent-amber);font-size:0.82rem;color:var(--text-secondary);">
+                    <strong style="color:var(--accent-amber);">Remark:</strong> ${remark}
+                </div>`;
+            }
+        }
+
+        html += `</div></div>`; // close shift-card-body and shift-card
+    });
+
+    container.innerHTML = html;
+}
+
+function renderDailyQuality(dateInfo, container) {
+    // Filter QC data for this date
+    const dayData = allData.filter(r => (r.qcDate || r.date) === dateInfo.display);
+
+    if (dayData.length === 0) {
+        container.innerHTML = `<div class="daily-empty"><span class="empty-icon">📭</span>No quality data for ${formatDate(dateInfo.display)}</div>`;
+        return;
+    }
+
+    // Group by QC shift
+    const shifts = { 'I': [], 'II': [], 'III': [] };
+    dayData.forEach(r => {
+        const s = r.qcShift || r.shift || 'I';
+        if (shifts[s]) shifts[s].push(r);
+    });
+
+    let html = '';
+    ['I', 'II', 'III'].forEach(shiftName => {
+        const rows = shifts[shiftName];
+        if (rows.length === 0) return;
+
+        const badgeClass = shiftName === 'I' ? 'shift-i' : shiftName === 'II' ? 'shift-ii' : 'shift-iii';
+        const qcNames = [...new Set(rows.map(r => r.qcName).filter(Boolean))].join(', ') || '—';
+        const totalQty = rows.reduce((s, r) => s + r.totalPipes, 0);
+        const totalAcc = rows.reduce((s, r) => s + r.accepted, 0);
+        const totalRej = rows.reduce((s, r) => s + r.rejected, 0);
+        const totalCavity = rows.reduce((s, r) => s + r.cavity, 0);
+        const totalCracks = rows.reduce((s, r) => s + r.cracks, 0);
+        const totalRCracks = rows.reduce((s, r) => s + r.rCracks, 0);
+        const totalOvality = rows.reduce((s, r) => s + r.ovality, 0);
+        const totalOthers = rows.reduce((s, r) => s + r.others, 0);
+        const rejPct = totalQty > 0 ? ((totalRej / totalQty) * 100).toFixed(1) : '0.0';
+
+        html += `<div class="shift-card">
+            <div class="shift-card-header">
+                <div class="shift-card-title">
+                    <div class="shift-badge ${badgeClass}">${shiftName}</div>
+                    <div>
+                        <h4>Shift ${shiftName} — Quality</h4>
+                        <span>QC: ${qcNames}</span>
+                    </div>
+                </div>
+                <div class="shift-card-meta">
+                    <div>Checked: <strong>${totalQty}</strong></div>
+                    <div>Rejected: <strong style="color:var(--accent-red);">${totalRej} (${rejPct}%)</strong></div>
+                </div>
+            </div>
+            <div class="shift-card-body">
+                <table class="report-table" style="margin-bottom:0;">
+                    <thead><tr>
+                        <th>Pipe Size</th><th>Trolley</th><th>Total</th><th>Accept</th><th>Reject</th>
+                        <th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
+                    </tr></thead><tbody>`;
+
+        rows.forEach(r => {
+            const rp = r.totalPipes > 0 ? ((r.rejected / r.totalPipes) * 100).toFixed(1) : '0.0';
+            const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+            html += `<tr>
+                <td>${r.pipeSize}</td><td>${r.trolleyNo}</td><td>${r.totalPipes}</td>
+                <td class="badge-accepted">${r.accepted}</td><td class="badge-rejected">${r.rejected}</td>
+                <td>${r.cavity || ''}</td><td>${r.cracks || ''}</td><td>${r.rCracks || ''}</td>
+                <td>${r.ovality || ''}</td><td>${r.others || ''}</td>
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+            </tr>`;
+        });
+
+        html += `<tr class="subtotal-row">
+            <td colspan="2" style="text-align:right;"><strong>Shift Total</strong></td>
+            <td><strong>${totalQty}</strong></td><td><strong>${totalAcc}</strong></td><td><strong>${totalRej}</strong></td>
+            <td><strong>${totalCavity || ''}</strong></td><td><strong>${totalCracks || ''}</strong></td>
+            <td><strong>${totalRCracks || ''}</strong></td><td><strong>${totalOvality || ''}</strong></td>
+            <td><strong>${totalOthers || ''}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good'}">${rejPct}%</span></strong></td>
+        </tr></tbody></table>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function renderDaily24HrSummary(dateInfo, container) {
+    const dayData = allData.filter(r => r.date === dateInfo.display);
+    if (dayData.length === 0) { container.innerHTML = ''; return; }
+
+    const totalQty = dayData.reduce((s, r) => s + r.totalPipes, 0);
+    const totalWt = dayData.reduce((s, r) => s + r.totalWt, 0);
+    const totalAcc = dayData.reduce((s, r) => s + r.accepted, 0);
+    const totalRej = dayData.reduce((s, r) => s + r.rejected, 0);
+    const totalAccWt = dayData.reduce((s, r) => s + r.acceptedWt, 0);
+    const totalRejWt = dayData.reduce((s, r) => s + r.rejectedWt, 0);
+    const rejPct = totalQty > 0 ? ((totalRej / totalQty) * 100).toFixed(1) : '0.0';
+    const shiftsActive = new Set(dayData.map(r => r.shift)).size;
+
+    // Shift level summary
+    const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateInfo.display);
+    const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch']) || 0), 0);
+    const totalInputKg = dayShiftData.reduce((s, r) => s + (parseFloat(r['Input KG_BS']) || 0), 0);
+
+    container.innerHTML = `<div class="daily-summary-card">
+        <h4>📊 24-Hour Summary — ${formatDate(dateInfo.display)}</h4>
+        <div class="daily-summary-grid">
+            <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${shiftsActive}</div><div class="ds-unit">of 3</div></div>
+            <div class="daily-summary-item"><div class="ds-label">Total Pipes</div><div class="ds-value">${totalQty.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
+            <div class="daily-summary-item"><div class="ds-label">Total Weight</div><div class="ds-value">${totalWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
+            <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
+            <div class="daily-summary-item"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
+            <div class="daily-summary-item"><div class="ds-label">Total Batches</div><div class="ds-value">${totalBatches || '—'}</div><div class="ds-unit">${totalInputKg ? totalInputKg + ' Kg input' : ''}</div></div>
+        </div>
+    </div>`;
+}
+
+function exportMonthlyCSV() {
+    const dateInfo = getDailyDate();
+    if (!dateInfo) return;
+    const parts = dateInfo.iso.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthLabel = `${monthNames[month-1]}-${year}`;
+
+    let csv = 'sep=,\r\n';
+    const headers = ['Date','Shift I Pipes','Shift I Wt (Kg)','Shift II Pipes','Shift II Wt (Kg)','Shift III Pipes','Shift III Wt (Kg)','Day Total Pipes','Day Total Wt (Kg)','Accepted','Rejected','Rej %'];
+    csv += headers.map(csvSafe).join(',') + '\r\n';
+
+    let gmPipes = 0, gmWt = 0, gmAcc = 0, gmRej = 0;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dd = String(day).padStart(2, '0');
+        const mm = String(month).padStart(2, '0');
+        const dateStr = `${dd}-${mm}-${year}`;
+        const dayRows = allData.filter(r => r.date === dateStr);
+
+        const byShift = { 'I': { pipes: 0, wt: 0 }, 'II': { pipes: 0, wt: 0 }, 'III': { pipes: 0, wt: 0 } };
+        let dayPipes = 0, dayWt = 0, dayAcc = 0, dayRej = 0;
+
+        dayRows.forEach(r => {
+            const s = r.shift || 'I';
+            if (byShift[s]) {
+                byShift[s].pipes += r.totalPipes;
+                byShift[s].wt += r.totalWt;
+            }
+            dayPipes += r.totalPipes;
+            dayWt += r.totalWt;
+            dayAcc += r.accepted;
+            dayRej += r.rejected;
+        });
+
+        gmPipes += dayPipes;
+        gmWt += dayWt;
+        gmAcc += dayAcc;
+        gmRej += dayRej;
+
+        const rejPct = dayPipes > 0 ? ((dayRej / dayPipes) * 100).toFixed(1) + '%' : '';
+
+        csv += [dateStr, byShift['I'].pipes || '', (byShift['I'].wt || '').toFixed ? byShift['I'].wt.toFixed(1) : '',
+            byShift['II'].pipes || '', byShift['II'].wt ? byShift['II'].wt.toFixed(1) : '',
+            byShift['III'].pipes || '', byShift['III'].wt ? byShift['III'].wt.toFixed(1) : '',
+            dayPipes || '', dayWt ? dayWt.toFixed(1) : '', dayAcc || '', dayRej || '', rejPct
+        ].map(csvSafe).join(',') + '\r\n';
+    }
+
+    // Grand total row
+    const gmRejPct = gmPipes > 0 ? ((gmRej / gmPipes) * 100).toFixed(1) + '%' : '';
+    csv += ['TOTAL','','','','','','',gmPipes,gmWt.toFixed(1),gmAcc,gmRej,gmRejPct].map(csvSafe).join(',') + '\r\n';
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Demech_Monthly_Summary_${monthLabel}.csv`;
+    link.click();
+    showToast(`Monthly summary for ${monthLabel} downloaded!`, 'success');
 }
 
 // ============ TAB NAVIGATION ============
@@ -2139,13 +2472,15 @@ async function initApp() {
 
     try {
         // Fetch data from Google Sheets (parallel)
-        const [rawData, rawPipeMaster] = await Promise.all([
+        const [rawData, rawPipeMaster, rawShiftLevel] = await Promise.all([
             fetchSheetData(SHEETS.report),
-            fetchSheetData(SHEETS.pipeMaster).catch(() => [])
+            fetchSheetData(SHEETS.pipeMaster).catch(() => []),
+            fetchSheetData(SHEETS.shiftLevel).catch(() => [])
         ]);
 
         allData = transformReportData(rawData);
         pipeMasterData = rawPipeMaster || [];
+        shiftLevelData = rawShiftLevel || [];
 
         // Set default date filter: last 7 days for dashboard
         setDefaultDateRange();
