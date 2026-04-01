@@ -1748,6 +1748,10 @@ function switchDailySub(sub) {
     dailySubTab = sub;
     document.querySelectorAll('.daily-sub-tab').forEach(b => b.classList.remove('active'));
     document.getElementById(sub === 'production' ? 'dailySubProd' : 'dailySubQual')?.classList.add('active');
+    const titleEl = document.getElementById('dailyReportTitle');
+    if (titleEl) {
+        titleEl.textContent = sub === 'production' ? '\ud83c\udfed Shiftwise Production Logbook' : '\ud83d\udd0d Shiftwise Quality Inspection Report';
+    }
     renderDailyReport();
 }
 
@@ -1968,6 +1972,7 @@ function renderDailyQuality(dateInfo, container) {
                 <table class="report-table" style="margin-bottom:0;">
                     <thead><tr>
                         <th>Sr.</th><th>Pipe Size</th><th>Total</th><th>Accept</th><th>Reject</th>
+                        <th>Total Wt</th><th>Acc Wt</th><th>Rej Wt</th>
                         <th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
                     </tr></thead><tbody>`;
 
@@ -1975,10 +1980,13 @@ function renderDailyQuality(dateInfo, container) {
         const pipeSizeMap = {};
         rows.forEach(r => {
             const ps = r.pipeSize || '—';
-            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, total: 0, acc: 0, rej: 0, cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0 };
+            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, total: 0, acc: 0, rej: 0, totalWt: 0, accWt: 0, rejWt: 0, cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0 };
             pipeSizeMap[ps].total += r.totalPipes;
             pipeSizeMap[ps].acc += r.accepted;
             pipeSizeMap[ps].rej += r.rejected;
+            pipeSizeMap[ps].totalWt += r.totalWt;
+            pipeSizeMap[ps].accWt += r.acceptedWt;
+            pipeSizeMap[ps].rejWt += r.rejectedWt;
             pipeSizeMap[ps].cavity += r.cavity;
             pipeSizeMap[ps].cracks += r.cracks;
             pipeSizeMap[ps].rCracks += r.rCracks;
@@ -1993,15 +2001,20 @@ function renderDailyQuality(dateInfo, container) {
             html += `<tr>
                 <td>${idx+1}</td><td>${p.pipeSize}</td><td>${p.total}</td>
                 <td class="badge-accepted">${p.acc}</td><td class="badge-rejected">${p.rej}</td>
+                <td>${p.totalWt.toFixed(1)}</td><td>${p.accWt.toFixed(1)}</td><td>${p.rejWt.toFixed(1)}</td>
                 <td>${p.cavity || ''}</td><td>${p.cracks || ''}</td><td>${p.rCracks || ''}</td>
                 <td>${p.ovality || ''}</td><td>${p.others || ''}</td>
                 <td><span class="badge-rate ${rc}">${rp}%</span></td>
             </tr>`;
         });
 
+        const sTotalWt = rows.reduce((s, r) => s + r.totalWt, 0);
+        const sAccWt = rows.reduce((s, r) => s + r.acceptedWt, 0);
+        const sRejWt = rows.reduce((s, r) => s + r.rejectedWt, 0);
         html += `<tr class="subtotal-row">
             <td colspan="2" style="text-align:right;"><strong>Shift Total</strong></td>
             <td><strong>${totalQty}</strong></td><td><strong>${totalAcc}</strong></td><td><strong>${totalRej}</strong></td>
+            <td><strong>${sTotalWt.toFixed(1)}</strong></td><td><strong>${sAccWt.toFixed(1)}</strong></td><td><strong>${sRejWt.toFixed(1)}</strong></td>
             <td><strong>${totalCavity || ''}</strong></td><td><strong>${totalCracks || ''}</strong></td>
             <td><strong>${totalRCracks || ''}</strong></td><td><strong>${totalOvality || ''}</strong></td>
             <td><strong>${totalOthers || ''}</strong></td>
