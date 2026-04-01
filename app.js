@@ -1943,18 +1943,34 @@ function renderDailyQuality(dateInfo, container) {
             <div class="shift-card-body">
                 <table class="report-table" style="margin-bottom:0;">
                     <thead><tr>
-                        <th>Pipe Size</th><th>Trolley</th><th>Total</th><th>Accept</th><th>Reject</th>
+                        <th>Sr.</th><th>Pipe Size</th><th>Total</th><th>Accept</th><th>Reject</th>
                         <th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
                     </tr></thead><tbody>`;
 
+        // Aggregate by pipe size (no trolley detail)
+        const pipeSizeMap = {};
         rows.forEach(r => {
-            const rp = r.totalPipes > 0 ? ((r.rejected / r.totalPipes) * 100).toFixed(1) : '0.0';
+            const ps = r.pipeSize || '—';
+            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, total: 0, acc: 0, rej: 0, cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0 };
+            pipeSizeMap[ps].total += r.totalPipes;
+            pipeSizeMap[ps].acc += r.accepted;
+            pipeSizeMap[ps].rej += r.rejected;
+            pipeSizeMap[ps].cavity += r.cavity;
+            pipeSizeMap[ps].cracks += r.cracks;
+            pipeSizeMap[ps].rCracks += r.rCracks;
+            pipeSizeMap[ps].ovality += r.ovality;
+            pipeSizeMap[ps].others += r.others;
+        });
+        const pipeRows = Object.values(pipeSizeMap);
+
+        pipeRows.forEach((p, idx) => {
+            const rp = p.total > 0 ? ((p.rej / p.total) * 100).toFixed(1) : '0.0';
             const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
             html += `<tr>
-                <td>${r.pipeSize}</td><td>${r.trolleyNo}</td><td>${r.totalPipes}</td>
-                <td class="badge-accepted">${r.accepted}</td><td class="badge-rejected">${r.rejected}</td>
-                <td>${r.cavity || ''}</td><td>${r.cracks || ''}</td><td>${r.rCracks || ''}</td>
-                <td>${r.ovality || ''}</td><td>${r.others || ''}</td>
+                <td>${idx+1}</td><td>${p.pipeSize}</td><td>${p.total}</td>
+                <td class="badge-accepted">${p.acc}</td><td class="badge-rejected">${p.rej}</td>
+                <td>${p.cavity || ''}</td><td>${p.cracks || ''}</td><td>${p.rCracks || ''}</td>
+                <td>${p.ovality || ''}</td><td>${p.others || ''}</td>
                 <td><span class="badge-rate ${rc}">${rp}%</span></td>
             </tr>`;
         });
