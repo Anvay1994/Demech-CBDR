@@ -333,7 +333,8 @@ function transformReportData(rawData) {
             ovality: parseInt(row['Ovality']) || 0,
             others: parseInt(row['Others']) || 0,
             acceptedWt,
-            rejectedWt: Math.abs(rejectedWt)
+            rejectedWt: Math.abs(rejectedWt),
+            status: (row['Status'] || '').trim()
         };
     }).filter(r => (r.date && r.date !== "") || (r.totalPipes > 0) || (r.qcName && r.qcName !== ""));
 
@@ -371,7 +372,8 @@ function transformReportData(rawData) {
                 ovality: 0,
                 others: 0,
                 acceptedWt: 0,
-                rejectedWt: 0
+                rejectedWt: 0,
+                statuses: new Set()
             };
         }
         const a = aggMap[key];
@@ -390,13 +392,14 @@ function transformReportData(rawData) {
         a.others += r.others;
         a.acceptedWt += r.acceptedWt;
         a.rejectedWt += r.rejectedWt;
+        if (r.status) a.statuses.add(r.status);
     });
 
     // Calculate percentages after aggregation
     const aggregated = Object.values(aggMap).map(r => {
         const rejPct = r.totalPipes > 0 ? ((r.rejected / r.totalPipes) * 100).toFixed(1) + '%' : '0.0%';
         const accPct = r.totalPipes > 0 ? ((r.accepted / r.totalPipes) * 100).toFixed(1) + '%' : '0.0%';
-        return { ...r, qcName: [...r.qcNames].join(', '), rejectedPct: rejPct, acceptedPct: accPct };
+        return { ...r, qcName: [...r.qcNames].join(', '), status: [...(r.statuses || [])].join(', '), rejectedPct: rejPct, acceptedPct: accPct };
     });
 
     console.log('Aggregated rows:', aggregated.length, '(from', transformed.length, 'raw rows)');
@@ -1828,6 +1831,11 @@ function renderDailyProduction(dateInfo, container) {
         const totalQty = pipeRows.reduce((s, p) => s + p.qty, 0);
         const totalWt = pipeRows.reduce((s, p) => s + p.totalWt, 0);
 
+        // Status breakdown
+        const qcChecked = rows.filter(r => r.status === 'QC Checked').reduce((s, r) => s + r.totalPipes, 0);
+        const insideTunnel = rows.filter(r => r.status === 'Inside Tunnel').reduce((s, r) => s + r.totalPipes, 0);
+        const otherStatus = totalQty - qcChecked - insideTunnel;
+
         html += `<div class="shift-card">
             <div class="shift-card-header">
                 <div class="shift-card-title">
@@ -1840,6 +1848,8 @@ function renderDailyProduction(dateInfo, container) {
                 <div class="shift-card-meta">
                     <div>Pipes: <strong>${totalQty}</strong></div>
                     <div>Weight: <strong>${totalWt.toFixed(1)} Kg</strong></div>
+                    ${qcChecked > 0 ? `<div style="color:var(--accent-green);">✓ QC: <strong>${qcChecked}</strong></div>` : ''}
+                    ${insideTunnel > 0 ? `<div style="color:var(--accent-amber);">⏳ Tunnel: <strong>${insideTunnel}</strong></div>` : ''}
                 </div>
             </div>
             <div class="shift-card-body">`;
@@ -1894,11 +1904,26 @@ function renderDailyProduction(dateInfo, container) {
 }
 
 function renderDailyQuality(dateInfo, container) {
-    // Filter QC data for this date
-    const dayData = allData.filter(r => (r.qcDate || r.date) === dateInfo.display);
+    // Filter QC data for this date — only show QC Checked entries
+    const allDayData = allData.filter(r => (r.qcDate || r.date) === dateInfo.display);
+    const dayData = allDayData.filter(r => r.status === 'QC Checked');
+    const tunnelCount = allDayData.filter(r => r.status === 'Inside Tunnel').reduce((s, r) => s + r.totalPipes, 0);
+
+    if (dayData.length === 0 && tunnelCount === 0) {
+        container.innerHTML = `<div class="daily-empty"><span class="empty-icon">📭</span>No quality data for ${formatDate(dateInfo.display)}</div>`;
+        return;
+    }
+
+    let html = '';
+    if (tunnelCount > 0) {
+        html += `<div style="padding:0.7rem 1rem;background:rgba(244,162,97,0.1);border:1px solid rgba(244,162,97,0.3);border-radius:10px;margin-bottom:1rem;font-size:0.85rem;color:var(--accent-amber);">
+            ⏳ <strong>${tunnelCount}</strong> pipes still Inside Tunnel — awaiting QC inspection
+        </div>`;
+    }
 
     if (dayData.length === 0) {
-        container.innerHTML = `<div class="daily-empty"><span class="empty-icon">📭</span>No quality data for ${formatDate(dateInfo.display)}</div>`;
+        html += `<div class="daily-empty"><span class="empty-icon">🔍</span>No QC Checked entries yet for ${formatDate(dateInfo.display)}</div>`;
+        container.innerHTML = html;
         return;
     }
 
@@ -1909,7 +1934,6 @@ function renderDailyQuality(dateInfo, container) {
         if (shifts[s]) shifts[s].push(r);
     });
 
-    let html = '';
     ['I', 'II', 'III'].forEach(shiftName => {
         const rows = shifts[shiftName];
         if (rows.length === 0) return;
