@@ -228,6 +228,31 @@ function transformReportData(rawData) {
             }
         }
 
+        // Robust mapping: try exact match, then any key containing the keyword
+        const getField = (row, keywords, exactFavors, excludes = []) => {
+            const allKeys = Object.keys(row);
+            
+            // 1. Case-insensitive match from a preferred list
+            for (const favor of exactFavors) {
+                const match = allKeys.find(k => k.toLowerCase().trim() === favor.toLowerCase().trim());
+                if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
+                    return String(row[match]).trim();
+                }
+            }
+
+            // 2. Try any key containing keywords (with exclusions)
+            for (const key of allKeys) {
+                const lowerKey = key.toLowerCase();
+                if (excludes.some(e => lowerKey.includes(e.toLowerCase()))) continue;
+                
+                if (keywords.some(k => lowerKey.includes(k.toLowerCase()))) {
+                    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
+                }
+            }
+            return '';
+        };
+
+        // --- Quantities & Weights (using getField for flexible matching) ---
         const totalPipes = parseInt(getField(row, ['prod qty', 'total pipe', 'total nos', 'total qty'], ['Prod Qty', 'Total Pipe Number', 'Total (Nos)'])) || 0;
         const accepted = parseInt(getField(row, ['accepted pipes', 'accepted (nos)', 'accept'], ['Accepted Pipes', 'Accepted (Nos)', 'Accept (Nos)'])) || 0;
         const rejected = parseInt(getField(row, ['rejected pipes', 'rejected (nos)', 'reject'], ['Rejected Pipes', 'Rejected (Nos)', 'Reject (Nos)'])) || 0;
@@ -268,30 +293,6 @@ function transformReportData(rawData) {
         let rawQcDate = parseDateInput(String(row['Date for Output'] || '').trim());
         // Fallback to input date if qc date is missing but qc shift exists
         if (!rawQcDate && rawDate) rawQcDate = rawDate;
-
-        // Robust mapping: try exact match, then any key containing the keyword
-        const getField = (row, keywords, exactFavors, excludes = []) => {
-            const allKeys = Object.keys(row);
-            
-            // 1. Case-insensitive match from a preferred list
-            for (const favor of exactFavors) {
-                const match = allKeys.find(k => k.toLowerCase().trim() === favor.toLowerCase().trim());
-                if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
-                    return String(row[match]).trim();
-                }
-            }
-
-            // 2. Try any key containing keywords (with exclusions)
-            for (const key of allKeys) {
-                const lowerKey = key.toLowerCase();
-                if (excludes.some(e => lowerKey.includes(e.toLowerCase()))) continue;
-                
-                if (keywords.some(k => lowerKey.includes(k.toLowerCase()))) {
-                    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
-                }
-            }
-            return '';
-        };
 
         const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor'], ['Time', 'Date', 'Shift']);
         const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'QC Name', 'Name'], ['Time', 'Date', 'Shift']);
