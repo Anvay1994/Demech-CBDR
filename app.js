@@ -1971,7 +1971,7 @@ function renderDailyQuality(dateInfo, container) {
             <div class="shift-card-body">
                 <table class="report-table" style="margin-bottom:0;">
                     <thead><tr>
-                        <th>Sr.</th><th>Pipe Size</th><th>Total</th><th>Accept</th><th>Reject</th>
+                        <th>Sr.</th><th>Pipe Size</th><th>Load Date</th><th>Total</th><th>Accept</th><th>Reject</th>
                         <th>Total Wt</th><th>Acc Wt</th><th>Rej Wt</th>
                         <th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
                     </tr></thead><tbody>`;
@@ -1980,7 +1980,8 @@ function renderDailyQuality(dateInfo, container) {
         const pipeSizeMap = {};
         rows.forEach(r => {
             const ps = r.pipeSize || '—';
-            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, total: 0, acc: 0, rej: 0, totalWt: 0, accWt: 0, rejWt: 0, cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0 };
+            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, loadDates: new Set(), total: 0, acc: 0, rej: 0, totalWt: 0, accWt: 0, rejWt: 0, cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0 };
+            if (r.date) pipeSizeMap[ps].loadDates.add(r.date);
             pipeSizeMap[ps].total += r.totalPipes;
             pipeSizeMap[ps].acc += r.accepted;
             pipeSizeMap[ps].rej += r.rejected;
@@ -1998,8 +1999,9 @@ function renderDailyQuality(dateInfo, container) {
         pipeRows.forEach((p, idx) => {
             const rp = p.total > 0 ? ((p.rej / p.total) * 100).toFixed(1) : '0.0';
             const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+            const ldStr = [...p.loadDates].join(', ');
             html += `<tr>
-                <td>${idx+1}</td><td>${p.pipeSize}</td><td>${p.total}</td>
+                <td>${idx+1}</td><td>${p.pipeSize}</td><td>${ldStr}</td><td>${p.total}</td>
                 <td class="badge-accepted">${p.acc}</td><td class="badge-rejected">${p.rej}</td>
                 <td>${p.totalWt.toFixed(1)}</td><td>${p.accWt.toFixed(1)}</td><td>${p.rejWt.toFixed(1)}</td>
                 <td>${p.cavity || ''}</td><td>${p.cracks || ''}</td><td>${p.rCracks || ''}</td>
@@ -2012,7 +2014,7 @@ function renderDailyQuality(dateInfo, container) {
         const sAccWt = rows.reduce((s, r) => s + r.acceptedWt, 0);
         const sRejWt = rows.reduce((s, r) => s + r.rejectedWt, 0);
         html += `<tr class="subtotal-row">
-            <td colspan="2" style="text-align:right;"><strong>Shift Total</strong></td>
+            <td colspan="3" style="text-align:right;"><strong>Shift Total</strong></td>
             <td><strong>${totalQty}</strong></td><td><strong>${totalAcc}</strong></td><td><strong>${totalRej}</strong></td>
             <td><strong>${sTotalWt.toFixed(1)}</strong></td><td><strong>${sAccWt.toFixed(1)}</strong></td><td><strong>${sRejWt.toFixed(1)}</strong></td>
             <td><strong>${totalCavity || ''}</strong></td><td><strong>${totalCracks || ''}</strong></td>
@@ -2132,6 +2134,10 @@ function switchTab(tabName) {
     // Show/hide sections
     document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
     document.getElementById(`section-${tabName}`)?.classList.add('active');
+
+    // Hide filters bar on Daily Report tab (it has its own date picker)
+    const filtersBar = document.querySelector('.filters-bar');
+    if (filtersBar) filtersBar.style.display = tabName === 'daily' ? 'none' : '';
 
     // Re-render the active tab content
     renderAll();
