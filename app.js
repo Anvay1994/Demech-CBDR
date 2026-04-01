@@ -268,24 +268,31 @@ function transformReportData(rawData) {
         if (!rawQcDate && rawDate) rawQcDate = rawDate;
 
         // Robust mapping: try exact match, then any key containing the keyword
-        const getField = (row, keywords, exactFavors) => {
-            // 1. Try exact matches from a preferred list
-            for (const key of exactFavors) {
-                if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
-            }
-            // 2. Try any key containing keywords
+        const getField = (row, keywords, exactFavors, excludes = []) => {
             const allKeys = Object.keys(row);
+            
+            // 1. Case-insensitive match from a preferred list
+            for (const favor of exactFavors) {
+                const match = allKeys.find(k => k.toLowerCase().trim() === favor.toLowerCase().trim());
+                if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
+                    return String(row[match]).trim();
+                }
+            }
+
+            // 2. Try any key containing keywords (with exclusions)
             for (const key of allKeys) {
                 const lowerKey = key.toLowerCase();
-                if (keywords.some(k => lowerKey.includes(k))) {
+                if (excludes.some(e => lowerKey.includes(e.toLowerCase()))) continue;
+                
+                if (keywords.some(k => lowerKey.includes(k.toLowerCase()))) {
                     if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
                 }
             }
             return '';
         };
 
-        const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor', 'Supervisor ']);
-        const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'Name', 'QC Name']);
+        const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor'], ['Time', 'Date', 'Shift']);
+        const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'QC Name', 'Name'], ['Time', 'Date', 'Shift']);
         const trolleyNo = getField(row, ['trolley'], ['Trolley no', 'Trolley No', 'Trolley No.']);
 
         const lDateRaw = getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date ']);
