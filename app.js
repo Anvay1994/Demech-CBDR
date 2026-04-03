@@ -1753,6 +1753,11 @@ function switchDailySub(sub) {
     dailySubTab = sub;
     document.querySelectorAll('.daily-sub-tab').forEach(b => b.classList.remove('active'));
     document.getElementById(sub === 'production' ? 'dailySubProd' : 'dailySubQual')?.classList.add('active');
+    
+    // Hide/Show QC toggle for production logbook
+    const qcToggleArea = document.getElementById('dailyProdQcToggleArea');
+    if (qcToggleArea) qcToggleArea.style.display = sub === 'production' ? 'flex' : 'none';
+
     const titleEl = document.getElementById('dailyReportTitle');
     if (titleEl) {
         titleEl.textContent = sub === 'production' ? '\ud83c\udfed Shiftwise Production Logbook' : '\ud83d\udd0d Shiftwise Quality Inspection Report';
@@ -1829,16 +1834,52 @@ function renderDailyProduction(dateInfo, container) {
         const badgeClass = shiftName === 'I' ? 'shift-i' : shiftName === 'II' ? 'shift-ii' : 'shift-iii';
 
         // Aggregate by pipe size
+        const showQC = document.getElementById('toggleDailyProdQc')?.checked;
         const pipeSizeMap = {};
+        
         rows.forEach(r => {
             const ps = r.pipeSize || '—';
-            if (!pipeSizeMap[ps]) pipeSizeMap[ps] = { pipeSize: ps, wtPerPipe: r.wtPerPipe, qty: 0, totalWt: 0 };
-            pipeSizeMap[ps].qty += r.totalPipes;
-            pipeSizeMap[ps].totalWt += r.totalWt;
+            if (!pipeSizeMap[ps]) {
+                pipeSizeMap[ps] = { 
+                    pipeSize: ps, 
+                    wtPerPipe: r.wtPerPipe, 
+                    qty: 0, 
+                    totalWt: 0,
+                    acc: 0,
+                    rej: 0,
+                    accWt: 0,
+                    rejWt: 0,
+                    cavity: 0,
+                    cracks: 0,
+                    rCracks: 0,
+                    ovality: 0,
+                    others: 0,
+                    hasPending: false 
+                };
+            }
+            const p = pipeSizeMap[ps];
+            p.qty += r.totalPipes;
+            p.totalWt += r.totalWt;
+            
+            // Collect QC metrics (from QC Checked entries)
+            if (r.status === 'QC Checked') {
+                p.acc += r.accepted;
+                p.rej += r.rejected;
+                p.accWt += r.acceptedWt;
+                p.rejWt += r.rejectedWt;
+                p.cavity += (r.cavity || 0);
+                p.cracks += (r.cracks || 0);
+                p.rCracks += (r.rCracks || 0);
+                p.ovality += (r.ovality || 0);
+                p.others += (r.others || 0);
+            } else if (r.status === 'Inside Tunnel') {
+                p.hasPending = true;
+            }
         });
+        
         const pipeRows = Object.values(pipeSizeMap);
-        const totalQty = pipeRows.reduce((s, p) => s + p.qty, 0);
-        const totalWt = pipeRows.reduce((s, p) => s + p.totalWt, 0);
+        const totalQty = pipeRows.reduce((sum, p) => sum + p.qty, 0);
+        const totalWt = pipeRows.reduce((sum, p) => sum + p.totalWt, 0);
 
         // Status breakdown
         const qcChecked = rows.filter(r => r.status === 'QC Checked').reduce((s, r) => s + r.totalPipes, 0);
@@ -1864,19 +1905,59 @@ function renderDailyProduction(dateInfo, container) {
             <div class="shift-card-body">`;
 
         if (pipeRows.length > 0) {
-            html += `<table class="report-table" style="margin-bottom:0;">
+            html += `<div class="report-table-wrapper" style="overflow-x: auto;">
+                <table class="report-table" style="margin-bottom:0; min-width: ${showQC ? '1400px' : '100%'}">
                 <thead><tr>
-                    <th>Sr.</th><th>Pipe Size (ID×L)</th><th>Unit Wt (Kg)</th><th>Qty (Nos)</th><th>Total Wt (Kg)</th>
+                    <th>Sr.</th><th>Pipe Size (ID×L)</th><th>Unit Wt (Kg)</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>
+                    ${showQC ? '<th>QC Status</th><th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>' : ''}
                 </tr></thead><tbody>`;
+            
             pipeRows.forEach((p, idx) => {
+                const rejPct = p.qty > 0 ? (p.rej / p.qty * 100).toFixed(1) : '0';
+                const showRemark = p.hasPending && (p.acc + p.rej === 0);
+                
                 html += `<tr>
-                    <td>${idx+1}</td><td>${p.pipeSize}</td><td>${p.wtPerPipe}</td><td>${p.qty}</td><td>${p.totalWt.toFixed(1)}</td>
+                    <td>${idx+1}</td>
+                    <td>${p.pipeSize}</td>
+                    <td>${p.wtPerPipe}</td>
+                    <td>${p.qty}</td>
+                    <td>${p.totalWt.toFixed(1)}</td>
+                    ${showQC ? `
+                        <td style="font-size: 0.75rem;">${showRemark ? '<span class="status-badge progress">Yet to be checked</span>' : (p.hasPending ? '<span class="status-badge progress">Partial</span>' : '<span class="status-badge done">✓ Checked</span>')}</td>
+                        <td>${showRemark ? '—' : p.acc}</td>
+                        <td class="badge-rejected">${showRemark ? '—' : p.rej}</td>
+                        <td>${showRemark ? '—' : p.accWt.toFixed(1)}</td>
+                        <td>${showRemark ? '—' : p.rejWt.toFixed(1)}</td>
+                        <td>${showRemark ? '—' : (p.cavity || '')}</td>
+                        <td>${showRemark ? '—' : (p.cracks || '')}</td>
+                        <td>${showRemark ? '—' : (p.rCracks || '')}</td>
+                        <td>${showRemark ? '—' : (p.ovality || '')}</td>
+                        <td>${showRemark ? '—' : (p.others || '')}</td>
+                        <td><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${showRemark ? '—' : rejPct + '%'}</span></td>
+                    ` : ''}
                 </tr>`;
             });
+            
+            const totalAcc = pipeRows.reduce((s, p) => s + p.acc, 0);
+            const totalRej = pipeRows.reduce((s, p) => s + p.rej, 0);
+            const totalAccWt = pipeRows.reduce((s, p) => s + p.accWt, 0);
+            const totalRejWt = pipeRows.reduce((s, p) => s + p.rejWt, 0);
+            const totalRejPct = totalQty > 0 ? (totalRej / totalQty * 100).toFixed(1) : '0';
+
             html += `<tr class="subtotal-row">
                 <td colspan="3" style="text-align:right;"><strong>Shift Total</strong></td>
-                <td><strong>${totalQty}</strong></td><td><strong>${totalWt.toFixed(1)}</strong></td>
-            </tr></tbody></table>`;
+                <td><strong>${totalQty}</strong></td>
+                <td><strong>${totalWt.toFixed(1)}</strong></td>
+                ${showQC ? `
+                    <td></td>
+                    <td><strong>${totalAcc}</strong></td>
+                    <td><strong>${totalRej}</strong></td>
+                    <td><strong>${totalAccWt.toFixed(1)}</strong></td>
+                    <td><strong>${totalRejWt.toFixed(1)}</strong></td>
+                    <td colspan="5"></td>
+                    <td><strong>${totalRejPct}%</strong></td>
+                ` : ''}
+            </tr></tbody></table></div>`;
         } else {
             html += `<div style="color:var(--text-muted);padding:0.5rem 0;">No pipe data for this shift</div>`;
         }
@@ -1891,6 +1972,7 @@ function renderDailyProduction(dateInfo, container) {
             const inputKgL1 = shiftComp['Input KG_L1'] || '';
             const inputKgL2 = shiftComp['Input KG_L2'] || '';
             const inputKgRR = shiftComp['Input KG_RR'] || '';
+            const inputFurnace = (parseFloat(inputKgBS || 0) + parseFloat(inputKgL1 || 0) + parseFloat(inputKgL2 || 0) + parseFloat(inputKgRR || 0)).toFixed(1);
             const remark = shiftComp['Remark'] || '';
 
             html += `<div class="composition-grid">
@@ -1898,6 +1980,7 @@ function renderDailyProduction(dateInfo, container) {
                 <div class="comp-item"><div class="comp-label">L1 Composition</div><div class="comp-value">${l1}</div><div class="comp-unit">${inputKgL1 ? inputKgL1 + ' Kg' : ''}</div></div>
                 <div class="comp-item"><div class="comp-label">L2 Composition</div><div class="comp-value">${l2}</div><div class="comp-unit">${inputKgL2 ? inputKgL2 + ' Kg' : ''}</div></div>
                 <div class="comp-item"><div class="comp-label">RR (RJM+RTL)</div><div class="comp-value">${rr}</div><div class="comp-unit">${inputKgRR ? inputKgRR + ' Kg' : ''}</div></div>
+                <div class="comp-item" style="border-color: var(--accent-amber);"><div class="comp-label" style="color: var(--accent-amber);">Input Furnace</div><div class="comp-value" style="color: var(--accent-amber);">${inputFurnace}</div><div class="comp-unit">Total Kg</div></div>
             </div>`;
             if (remark) {
                 html += `<div style="margin-top:0.75rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border-radius:8px;border-left:3px solid var(--accent-amber);font-size:0.82rem;color:var(--text-secondary);">

@@ -179,6 +179,12 @@
                         <button class="daily-sub-tab active" id="dailySubProd" onclick="switchDailySub('production')">🏭 Production</button>
                         <button class="daily-sub-tab" id="dailySubQual" onclick="switchDailySub('quality')">🔍 Quality</button>
                     </div>
+                    <div id="dailyProdQcToggleArea" style="display: flex; align-items: center; margin-left: auto;">
+                        <label class="qc-toggle-label" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; user-select: none;">
+                            <input type="checkbox" id="toggleDailyProdQc" onchange="renderDailyReport()" style="cursor: pointer; width: 15px; height: 15px;"> 
+                            Show QC Data
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Daily Content Area (filled by JS) -->
