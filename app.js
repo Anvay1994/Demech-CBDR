@@ -294,8 +294,6 @@ function transformReportData(rawData) {
 
         const rawDate = parseDateInput(String(row['Input Date'] || row['Date'] || '').trim());
         let rawQcDate = parseDateInput(String(row['Date for Output'] || '').trim());
-        // Fallback to input date if qc date is missing but qc shift exists
-        if (!rawQcDate && rawDate) rawQcDate = rawDate;
 
         const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor'], ['Time', 'Date', 'Shift']);
         const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'QC Name', 'Name'], ['Time', 'Date', 'Shift']);
@@ -568,18 +566,23 @@ function applyFilters() {
     const trolley = document.getElementById('filterTrolley')?.value;
 
     filteredData = allData.filter(row => {
+        const isQualityTab = (currentTab === 'quality');
+        const rowDateToCompare = isQualityTab ? row.qcDate : row.date;
+
         // Date filter
         if (dateFrom) {
-            const rowDate = parseDate(row.date);
+            const rowDate = parseDate(rowDateToCompare);
+            if (!rowDate) return false;
             const parts = dateFrom.split('-');
             const fromDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-            if (rowDate && rowDate < fromDate) return false;
+            if (rowDate < fromDate) return false;
         }
         if (dateTo) {
-            const rowDate = parseDate(row.date);
+            const rowDate = parseDate(rowDateToCompare);
+            if (!rowDate) return false;
             const parts = dateTo.split('-');
             const toDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-            if (rowDate && rowDate > toDate) return false;
+            if (rowDate > toDate) return false;
         }
         // Shift filter
         if (shift && shift !== 'all' && row.shift !== shift) return false;
@@ -893,7 +896,8 @@ function renderProductionSummary() {
 
 // ============ QUALITY REPORT TABLE ============
 function renderQualityReport() {
-    const data = filteredData;
+    // Only show QC Checked data in this report
+    const data = filteredData.filter(r => r.status === 'QC Checked');
     const tbody = document.getElementById('qualReportBody');
     const showTimeline = document.getElementById('toggleTimeline')?.checked !== false;
     
@@ -934,7 +938,7 @@ function renderQualityReport() {
         if (names.length === 0) names.push('—');
 
         names.forEach(qc => {
-            const dateToUse = row.qcDate || row.date;
+            const dateToUse = row.qcDate;
             const shiftToUse = row.qcShift || row.shift;
             const key = `${dateToUse}|${shiftToUse}|${qc}|${row.trolleyNo}`;
             if (!groups[key]) {
@@ -1069,7 +1073,8 @@ function renderQualityReport() {
 
 // ============ QUALITY SUMMARY TABLE ============
 function renderQualitySummary() {
-    const data = filteredData;
+    // Only show QC Checked data in this summary
+    const data = filteredData.filter(r => r.status === 'QC Checked');
     const tbody = document.getElementById('qualSummaryBody');
     tbody.innerHTML = '';
 
@@ -1908,10 +1913,10 @@ function renderDailyProduction(dateInfo, container) {
 }
 
 function renderDailyQuality(dateInfo, container) {
-    // Filter QC data for this date — only show QC Checked entries
-    const allDayData = allData.filter(r => (r.qcDate || r.date) === dateInfo.display);
-    const dayData = allDayData.filter(r => r.status === 'QC Checked');
-    const tunnelCount = allDayData.filter(r => r.status === 'Inside Tunnel').reduce((s, r) => s + r.totalPipes, 0);
+    // Filter QC data for this date — only show QC Checked entries based on Date for Output
+    const dayData = allData.filter(r => r.qcDate === dateInfo.display && r.status === 'QC Checked');
+    // Tunnel count based on production date (for pipes produced today but still awaiting check)
+    const tunnelCount = allData.filter(r => r.date === dateInfo.display && r.status === 'Inside Tunnel').reduce((s, r) => s + r.totalPipes, 0);
 
     if (dayData.length === 0 && tunnelCount === 0) {
         container.innerHTML = `<div class="daily-empty"><span class="empty-icon">📭</span>No quality data for ${formatDate(dateInfo.display)}</div>`;
@@ -2193,11 +2198,13 @@ function exportCSV(reportType) {
         csvContent += headers.map(csvSafe).join(',') + '\r\n';
 
         let srNo = 1;
-        data.forEach(row => {
+        // Only export QC Checked data for Quality report
+        const qData = data.filter(r => r.status === 'QC Checked');
+        qData.forEach(row => {
             const rowArr = [
                 srNo,
                 row.qcName || '—',
-                row.qcDate || row.date,
+                row.qcDate, // Strictly Date for Output
                 row.qcShift || row.shift,
                 row.supervisor,
                 row.pipeSize,

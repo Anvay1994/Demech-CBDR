@@ -115,7 +115,7 @@ function doGet(e) {
         var action = e.parameter.action || 'read';
         var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-        // AUTH
+        // AUTH / USER MANAGEMENT
         if (action === 'verify') {
             var email = (e.parameter.email || '').toLowerCase().trim();
             var userSheet = ss.getSheetByName('Users');
@@ -136,6 +136,19 @@ function doGet(e) {
                 }
             }
             return JSON_RESPONSE({ success: false });
+        }
+
+        if (action === 'addUser') {
+            var email = (e.parameter.email || '').toLowerCase().trim();
+            var name = e.parameter.name || '';
+            var role = e.parameter.role || 'User';
+            var userSheet = ss.getSheetByName('Users');
+            if (!userSheet) return JSON_RESPONSE({ error: 'Users sheet not found' });
+            
+            var userData = userSheet.getDataRange().getValues();
+            var lastSr = userData.length > 1 ? parseInt(userData[userData.length-1][0]) : 0;
+            userSheet.appendRow([lastSr + 1, name, email, role]);
+            return JSON_RESPONSE({ success: true, message: 'User added successfully' });
         }
 
         // DATA
