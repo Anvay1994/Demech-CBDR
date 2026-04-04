@@ -2133,7 +2133,13 @@ function renderDaily24HrSummary(dateInfo, container) {
     // Shift level summary
     const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateInfo.display);
     const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch']) || 0), 0);
-    const totalInputKg = dayShiftData.reduce((s, r) => s + (parseFloat(r['Input KG_BS']) || 0), 0);
+    const totalInputKg = dayShiftData.reduce((s, r) => {
+        const bs = parseFloat(r['Input KG_BS'] || 0);
+        const l1 = parseFloat(r['Input KG_L1'] || 0);
+        const l2 = parseFloat(r['Input KG_L2'] || 0);
+        const rr = parseFloat(r['Input KG_RR'] || 0);
+        return s + bs + l1 + l2 + rr;
+    }, 0);
 
     container.innerHTML = `<div class="daily-summary-card">
         <h4>📊 24-Hour Summary — ${formatDate(dateInfo.display)}</h4>
@@ -2143,7 +2149,7 @@ function renderDaily24HrSummary(dateInfo, container) {
             <div class="daily-summary-item"><div class="ds-label">Total Weight</div><div class="ds-value">${totalWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
             <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
             <div class="daily-summary-item"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
-            <div class="daily-summary-item"><div class="ds-label">Total Batches</div><div class="ds-value">${totalBatches || '—'}</div><div class="ds-unit">${totalInputKg ? totalInputKg + ' Kg input' : ''}</div></div>
+            <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-amber);"><div class="ds-label">Input Furnace</div><div class="ds-value" style="color:var(--accent-amber);">${totalInputKg.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">${totalBatches ? totalBatches + ' batches' : 'Total Kg'}</div></div>
         </div>
     </div>`;
 }
@@ -2458,6 +2464,46 @@ function runErrorChecks(data, pipeMaster) {
             });
         }
     });
+
+    // 6. Data Integrity Check (Dashboard vs Shift Level Data)
+    if (shiftLevelData && shiftLevelData.length > 0) {
+        // Group allData by date and shift
+        const aggregated = {};
+        allData.forEach(r => {
+            const key = `${r.date}|${r.shift}`;
+            if (!aggregated[key]) aggregated[key] = { pipes: 0, wt: 0 };
+            aggregated[key].pipes += r.totalPipes;
+            aggregated[key].wt += r.totalWt;
+        });
+
+        shiftLevelData.forEach(sl => {
+            const date = String(sl['Date'] || '').trim();
+            const shiftRaw = sl['Shift'];
+            const shift = getShiftLabel(shiftRaw);
+            const key = `${date}|${shift}`;
+
+            const slPipes = parseInt(sl['Total Pipes Produced']) || 0;
+            const slWt = parseFloat(sl['Total Weight']) || 0;
+
+            if (aggregated[key]) {
+                const diffPipes = Math.abs(aggregated[key].pipes - slPipes);
+                const diffWt = Math.abs(aggregated[key].wt - slWt);
+
+                if (diffPipes > 0 || diffWt > 0.5) {
+                    flags.push({
+                        id: `integ_mis_${date}_${shift}`,
+                        severity: 'error',
+                        type: 'Data Mismatch',
+                        details: `Shift Data (${slPipes} nos, ${slWt.toFixed(1)}kg) doesn't match Input Logs (${aggregated[key].pipes} nos, ${aggregated[key].wt.toFixed(1)}kg).`,
+                        date: date,
+                        affected: `Shift ${shift}`,
+                        rowIds: [],
+                        context: { tab: 'daily', date: date }
+                    });
+                }
+            }
+        });
+    }
 
     // Sort: errors first, then warnings
     flags.sort((a, b) => {

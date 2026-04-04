@@ -12,10 +12,10 @@
   --bg-card: rgba(22, 22, 50, 0.7);
   --bg-card-solid: #16163a;
   --bg-glass: rgba(255, 255, 255, 0.03);
-  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass: rgba(255, 255, 255, 0.12);
   --text-primary: #e8e8f0;
-  --text-secondary: #8888a8;
-  --text-muted: #5a5a7a;
+  --text-secondary: #a0a8cc;
+  --text-muted: #757ba3;
   --accent-blue: #4361ee;
   --accent-blue-glow: rgba(67, 97, 238, 0.3);
   --accent-green: #2ec4b6;
@@ -304,6 +304,18 @@ body::before {
 
 .form-group input::placeholder {
   color: var(--text-muted);
+}
+
+/* Improve Date Picker Icon Visibility */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.6;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .btn {

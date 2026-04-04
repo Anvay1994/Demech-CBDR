@@ -1,5 +1,5 @@
 // ============================================
-// Demech CBDR — QC Automation v13 (Production)
+// Demech CBDR — QC Automation v14 (Trolley Sync)
 // ============================================
 
 var API_TOKEN = 'demech_secure_2025';
@@ -7,8 +7,9 @@ var API_TOKEN = 'demech_secure_2025';
 /**
  * 1. AUTOMATION: handleQCAutomation
  * Runs when the spreadsheet changes (e.g. AppSheet sync).
+ * Synchronizes QC Metadata across all pipes in a Trolley cluster.
  */
-function handleQCAutomation(e) {
+function handleQCAutomation() {
   var lock = LockService.getScriptLock();
   try {
     // 20-second queue to handle multiple users syncing at once
@@ -16,87 +17,108 @@ function handleQCAutomation(e) {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName("Input Level Data");
-    if (!sheet) return;
+    if (!sheet) {
+      console.error("Sheet 'Input Level Data' not found.");
+      return;
+    }
 
-    // --- A. THE MASTER MAP (Hardcoded for your columns) ---
-    var colMap = { 
-      trolley: 9,   // Column I
-      dateOut: 24,  // Column X
-      shift: 25,    // Column Y
-      super: 26,    // Column Z
-      time: 27,     // Column AA
-      remarkCols: [] 
-    };
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    // --- A. DYNAMIC COLUMN MAPPING ---
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    var colMap = { remarks: [] };
     
-    // Auto-discover Remark columns (Cavity, Cracks, etc.)
-    var headers = sheet.getRange(1, 1, 1, 40).getDisplayValues()[0];
-    headers.forEach(function(h, j) {
-      if (!h) return;
-      var name = h.toString().toLowerCase().trim();
-      if (/cavity|cracks|r cracks|ovality|others/.test(name)) colMap.remarkCols.push(j + 1);
+    headers.forEach(function(h, i) {
+      var name = String(h).toLowerCase().trim();
+      // Column I: Trolley No.
+      if (name === "trolley no." || name === "trolley id" || name === "trolley") colMap.trolley = i + 1;
+      // Column X-AM: QC Metadata & Remarks
+      if (name === "date for output") colMap.dateOut = i + 1;
+      if (name === "shift" && i > 15) colMap.shift = i + 1;
+      if (name === "qc supervisor") colMap.super = i + 1;
+      if (name === "qc time") colMap.time = i + 1;
+      
+      // Remark columns (Cavity, Cracks, etc.)
+      if (/cavity|cracks|r cracks|ovality|others/.test(name)) colMap.remarks.push(i + 1);
     });
 
-    // --- B. BRUTE FORCE TIME CALCULATION (UTC + 5.5 hours) ---
-    var lastRow = sheet.getLastRow();
-    var startRow = Math.max(2, lastRow - 50);
-    var dataRange = sheet.getRange(startRow, 1, lastRow - startRow + 1, 35).getDisplayValues();
+    console.log("Column Map:", colMap);
 
-    // Force IST manually
-    var nowUtc = new Date();
-    var istNow = new Date(nowUtc.getTime() + (5.5 * 60 * 60 * 1000)); 
-    var dateStr = Utilities.formatDate(istNow, "GMT", "dd-MM-yyyy");
-    var timeStr = Utilities.formatDate(istNow, "GMT", "HH:mm:ss");
-    var shiftName = getShiftByTime(istNow);
+    // --- B. DEEP SCAN (2000 Rows) ---
+    // Production data (A-W) keeps updating at the bottom, so we search deep for QC entries (X-AM)
+    var rangeSize = 2000;
+    var startRow = Math.max(2, lastRow - rangeSize + 1);
+    var dataRange = sheet.getRange(startRow, 1, lastRow - startRow + 1, headers.length);
+    var data = dataRange.getValues();
 
-    for (var i = 0; i < dataRange.length; i++) {
-        var rowData = dataRange[i];
-        var curRow = startRow + i;
-        
-        var hasRemark = false;
-        colMap.remarkCols.forEach(function(c) { if (rowData[c-1] && rowData[c-1] !== "") hasRemark = true; });
+    // Mapping: Trolley ID -> { Date, Shift, Supervisor, Time }
+    var trolleyMasters = {};
 
-        if (hasRemark && (rowData[colMap.dateOut-1] === "" || rowData[colMap.shift-1] === "")) {
-            
-            // Set forceful IST points
-            sheet.getRange(curRow, colMap.dateOut).setValue(dateStr);
-            sheet.getRange(curRow, colMap.shift).setValue(shiftName);
+    console.log("Phase 1: Identifying Trolley Masters in last " + data.length + " rows...");
 
-            // B. Inheritance
-            var currentTrolleyID = rowData[colMap.trolley-1].toString().trim();
-            var foundSuper = "";
-            var foundTime  = "";
+    // First pass: Find rows with completely filled metadata (The "Master" rows)
+    for (var i = 0; i < data.length; i++) {
+        var row = data[i];
+        var trolleyId = String(row[colMap.trolley - 1]).trim();
+        if (!trolleyId) continue;
 
-            if (curRow > 2) {
-                var prevData = sheet.getRange(2, 1, curRow - 2, 35).getDisplayValues();
-                for (var j = prevData.length - 1; j >= 0; j--) {
-                    var pR = prevData[j];
-                    var pDate = pR[colMap.dateOut-1];
-                    if (!foundSuper && pR[colMap.super-1] !== "" && pDate === dateStr) {
-                        foundSuper = pR[colMap.super-1];
-                    }
-                    if (!foundTime && currentTrolleyID !== "" && pR[colMap.trolley-1].toString().trim() === currentTrolleyID && pDate === dateStr) {
-                        foundTime = pR[colMap.time-1];
-                    }
-                    if (foundSuper && foundTime) break;
-                }
-            }
+        var dateVal = row[colMap.dateOut - 1];
+        var shiftVal = row[colMap.shift - 1];
+        var superVal = row[colMap.super - 1];
+        var timeVal  = row[colMap.time - 1];
 
-            var existingSuper = rowData[colMap.super-1].toString().trim();
-            if (existingSuper === "" && foundSuper !== "") {
-                sheet.getRange(curRow, colMap.super).setValue(foundSuper);
-            }
-            sheet.getRange(curRow, colMap.time).setValue(foundTime || timeStr);
+        // If metadata is filled, this is a potential master for its trolley
+        if (dateVal && shiftVal && superVal && timeVal) {
+            trolleyMasters[trolleyId] = {
+                date: dateVal,
+                shift: shiftVal,
+                supervisor: superVal,
+                time: timeVal
+            };
         }
     }
+
+    console.log("Masters Found for " + Object.keys(trolleyMasters).length + " trolleys.");
+
+    // Second pass: Update rows that have QC Remarks but are missing metadata
+    var rowsUpdated = 0;
+    for (var k = 0; k < data.length; k++) {
+        var rowValues = data[k];
+        var currentTrolley = String(rowValues[colMap.trolley - 1]).trim();
+        var curRowNumber = startRow + k;
+
+        // Check if row has QC remarks (inclusive of '0')
+        var hasQCData = colMap.remarks.some(function(colIdx) {
+            var val = rowValues[colIdx - 1];
+            return val !== "" && val !== null;
+        });
+
+        // Trigger synchronization if missing metadata and we have a master for this trolley
+        if (hasQCData && !rowValues[colMap.dateOut - 1] && trolleyMasters[currentTrolley]) {
+            var master = trolleyMasters[currentTrolley];
+            console.log("Synchronizing Row " + curRowNumber + " (Trolley: " + currentTrolley + ")");
+
+            sheet.getRange(curRowNumber, colMap.dateOut).setValue(master.date);
+            sheet.getRange(curRowNumber, colMap.shift).setValue(master.shift);
+            sheet.getRange(curRowNumber, colMap.super).setValue(master.supervisor);
+            sheet.getRange(curRowNumber, colMap.time).setValue(master.time);
+            
+            rowsUpdated++;
+        }
+    }
+
+    console.log("Sync Complete. Rows Updated: " + rowsUpdated);
+
   } catch (err) {
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Input Level Data").getRange("Z2").setValue("Error: " + err.toString());
+    console.error("Automation Error: " + err.toString());
   } finally {
     lock.releaseLock();
   }
 }
 
 /**
- * 2. SHIFT HELPER: Based on Manual IST Date
+ * SHIFT HELPER: Based on Manual IST Date
  */
 function getShiftByTime(istDate) {
   var h = istDate.getUTCHours() + (istDate.getUTCMinutes() / 60);
@@ -106,7 +128,8 @@ function getShiftByTime(istDate) {
 }
 
 /**
- * 3. API PROXY: doGet (Dashboard Connection)
+ * 2. API PROXY: doGet (Dashboard Connection)
+ * Handles User verification and Sheet Data serving
  */
 function doGet(e) {
     try {
@@ -115,65 +138,59 @@ function doGet(e) {
         var action = e.parameter.action || 'read';
         var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-        // AUTH / USER MANAGEMENT
+        // --- AUTH / USER VERIFICATION ---
         if (action === 'verify') {
             var email = (e.parameter.email || '').toLowerCase().trim();
             var userSheet = ss.getSheetByName('Users');
             if (userSheet) {
                 var userData = userSheet.getDataRange().getValues();
-                var headers = userData[0];
-                var emIdx = -1, nmIdx = -1, rlIdx = -1;
-                for (var j = 0; j < headers.length; j++) {
-                    var h = String(headers[j]).toLowerCase();
-                    if (h.includes('email')) emIdx = j;
-                    if (h.includes('name')) nmIdx = j;
-                    if (h.includes('role')) rlIdx = j;
-                }
+                var hds = userData[0];
+                var emIdx = hds.findIndex(h => /email/i.test(h));
+                var nmIdx = hds.findIndex(h => /name/i.test(h));
+                var rlIdx = hds.findIndex(h => /role/i.test(h));
+                
                 for (var i = 1; i < userData.length; i++) {
                     if (String(userData[i][emIdx]).toLowerCase().trim() === email) {
-                        return JSON_RESPONSE({ success: true, user: { email: email, name: userData[i][nmIdx], role: userData[i][rlIdx] } });
+                        return JSON_RESPONSE({ 
+                           success: true, 
+                           user: { email: email, name: userData[i][nmIdx], role: userData[i][rlIdx] } 
+                        });
                     }
                 }
             }
             return JSON_RESPONSE({ success: false });
         }
 
-        if (action === 'addUser') {
-            var email = (e.parameter.email || '').toLowerCase().trim();
-            var name = e.parameter.name || '';
-            var role = e.parameter.role || 'User';
-            var userSheet = ss.getSheetByName('Users');
-            if (!userSheet) return JSON_RESPONSE({ error: 'Users sheet not found' });
-            
-            var userData = userSheet.getDataRange().getValues();
-            var lastSr = userData.length > 1 ? parseInt(userData[userData.length-1][0]) : 0;
-            userSheet.appendRow([lastSr + 1, name, email, role]);
-            return JSON_RESPONSE({ success: true, message: 'User added successfully' });
-        }
-
-        // DATA
+        // --- DATA SERVING (Dashboard Feed) ---
         var sheetName = e.parameter.sheet || 'Input Level Data';
         var sheet = ss.getSheetByName(sheetName);
-        if (!sheet) return JSON_RESPONSE({ error: 'Sheet not found' });
+        if (!sheet) return JSON_RESPONSE({ error: 'Sheet "' + sheetName + '" not found' });
+        
         var data = sheet.getDataRange().getValues();
-        var hds = data[0];
+        var headers = data[0];
         var results = [];
+        
         for (var i = 1; i < data.length; i++) {
             var obj = {};
             var hasVal = false;
-            for (var j = 0; j < hds.length; j++) {
-                var k = String(hds[j]).trim();
-                var v = data[i][j];
-                // Spreadsheet is already IST — just format directly
-                if (v instanceof Date) {
-                  v = Utilities.formatDate(v, Session.getScriptTimeZone(), 'dd-MM-yyyy');
+            for (var j = 0; j < headers.length; j++) {
+                var key = String(headers[j]).trim();
+                var val = data[i][j];
+                
+                // Force IST formatting for Dates for the dashboard
+                if (val instanceof Date) {
+                  // Spreadsheet is already IST, so we avoid adding an offset if it leads to date shifts
+                  // Instead, we just format it directly.
+                  val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd-MM-yyyy');
                 }
-                obj[k] = v;
-                if (v !== '' && v !== 0 && v !== null) hasVal = true;
+                
+                obj[key] = val;
+                if (val !== '' && val !== 0 && val !== null) hasVal = true;
             }
             if (hasVal) results.push(obj);
         }
         return JSON_RESPONSE({ data: results });
+
     } catch (err) {
         return JSON_RESPONSE({ error: 'System Error: ' + err.toString() });
     }
