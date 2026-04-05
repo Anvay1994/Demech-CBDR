@@ -2075,12 +2075,13 @@ function renderDailyQuality(dateInfo, container) {
                 </div>
             </div>
             <div class="shift-card-body">
-                <table class="report-table" style="margin-bottom:0;">
-                    <thead><tr>
-                        <th>Sr.</th><th>Pipe Size</th><th>Load Date</th><th>Total</th><th>Accept</th><th>Reject</th>
-                        <th>Total Wt</th><th>Acc Wt</th><th>Rej Wt</th>
-                        <th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
-                    </tr></thead><tbody>`;
+                <div class="report-table-wrapper" style="overflow-x: auto;">
+                    <table class="report-table" style="margin-bottom:0; min-width: 1200px;">
+                        <thead><tr>
+                            <th>Sr.</th><th>Pipe Size</th><th>Load Date</th><th>Total</th><th>Accept</th><th>Reject</th>
+                            <th>Total Wt</th><th>Acc Wt</th><th>Rej Wt</th>
+                            <th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
+                        </tr></thead><tbody>`;
 
         // Aggregate by pipe size (no trolley detail)
         const pipeSizeMap = {};
@@ -2127,9 +2128,7 @@ function renderDailyQuality(dateInfo, container) {
             <td><strong>${totalRCracks || ''}</strong></td><td><strong>${totalOvality || ''}</strong></td>
             <td><strong>${totalOthers || ''}</strong></td>
             <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good'}">${rejPct}%</span></strong></td>
-        </tr></tbody></table>
-            </div>
-        </div>`;
+        </tr></tbody></table></div></div></div>`;
     });
 
     container.innerHTML = html;
