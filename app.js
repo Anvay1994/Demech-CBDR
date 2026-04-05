@@ -2270,13 +2270,18 @@ function renderSummaryReport() {
 
     let periodData = [];
     let periodLabel = '';
+    const isQual = summaryView === 'quality';
+    const dateField = isQual ? 'qcDate' : 'date';
 
     if (summaryPeriod === 'monthly') {
         const val = document.getElementById('summaryMonth').value;
         if (!val) { container.innerHTML = '<div class="empty-state">Select a month</div>'; return; }
         const [year, month] = val.split('-');
         periodData = allData.filter(r => {
-            const parts = (r.qcDate || r.date).split('-');
+            if (isQual && r.status !== 'QC Checked') return false;
+            const d = r[dateField];
+            if (!d) return false;
+            const parts = d.split('-');
             return parts[1] === month && parts[2] === year;
         });
         const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -2284,7 +2289,10 @@ function renderSummaryReport() {
     } else {
         const val = document.getElementById('summaryYear').value; // e.g. "26-27"
         periodData = allData.filter(r => {
-            const parts = (r.qcDate || r.date).split('-');
+            if (isQual && r.status !== 'QC Checked') return false;
+            const d = r[dateField];
+            if (!d) return false;
+            const parts = d.split('-');
             if (parts.length < 3) return false;
             const yearStr = parts[2].substring(2); // "26"
             const monthInt = parseInt(parts[1]);
@@ -2342,7 +2350,7 @@ function renderSummaryReport() {
 
     kpiEl.innerHTML = `
         <div class="kpi-card blue">
-            <div class="kpi-label">Total Produced</div>
+            <div class="kpi-label">${isQual ? 'Total Checked' : 'Total Produced'}</div>
             <div class="kpi-value">${totalQty}</div>
             <div class="kpi-sub">pipes in ${periodLabel}</div>
         </div>
@@ -2357,7 +2365,7 @@ function renderSummaryReport() {
             <div class="kpi-sub">${rejPct}% rejection rate</div>
         </div>
         <div class="kpi-card amber">
-            <div class="kpi-label">Weight Produced</div>
+            <div class="kpi-label">Weight ${isQual ? 'Checked' : 'Produced'}</div>
             <div class="kpi-value">${(totalWt/1000).toFixed(1)}T</div>
             <div class="kpi-sub">Total Metric Tons</div>
         </div>
