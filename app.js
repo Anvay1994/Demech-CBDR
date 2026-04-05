@@ -2241,9 +2241,7 @@ function exportMonthlyCSV() {
 // ============ SUMMARY REPORTS (MONTHLY/YEARLY) ============
 function setSummaryPeriod(period) {
     summaryPeriod = period;
-    document.querySelectorAll('#section-summary .tab-btn').forEach(b => {
-        if (b.onclick.toString().includes('setSummaryPeriod')) b.classList.remove('active');
-    });
+    document.querySelectorAll('#section-summary .daily-sub-tabs:first-child .daily-sub-tab').forEach(b => b.classList.remove('active'));
     document.getElementById(period === 'monthly' ? 'btnSummaryMonthly' : 'btnSummaryYearly')?.classList.add('active');
     document.getElementById('summaryMonthPicker').style.display = period === 'monthly' ? 'block' : 'none';
     document.getElementById('summaryYearPicker').style.display = period === 'yearly' ? 'block' : 'none';
