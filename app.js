@@ -971,6 +971,15 @@ function renderQualityReport() {
     const gtAccWt = data.reduce((s, r) => s + r.acceptedWt, 0);
     const gtRejWt = data.reduce((s, r) => s + r.rejectedWt, 0);
 
+    // Aggregate defects for Grand Total tooltip
+    const gtDefects = {
+        cavity: data.reduce((s, r) => s + (r.cavity || 0), 0),
+        cracks: data.reduce((s, r) => s + (r.cracks || 0), 0),
+        rCracks: data.reduce((s, r) => s + (r.rCracks || 0), 0),
+        ovality: data.reduce((s, r) => s + (r.ovality || 0), 0),
+        others: data.reduce((s, r) => s + (r.others || 0), 0)
+    };
+
     let srNo = 1;
     sortedGroups.forEach(group => {
         let stQty = 0, stAcc = 0, stRej = 0, stTotalWt = 0, stAccWt = 0, stRejWt = 0;
@@ -1058,7 +1067,7 @@ function renderQualityReport() {
         ${showTimeline ? '<td colspan="4"></td>' : ''}
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
-        <td><strong>${gtRej}</strong></td>
+        <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${gtRej}</strong></td>
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
@@ -1121,6 +1130,15 @@ function renderQualitySummary() {
     const gtAccWt = data.reduce((s, r) => s + r.acceptedWt, 0);
     const gtRejWt = data.reduce((s, r) => s + r.rejectedWt, 0);
 
+    // Aggregate defects for Grand Total tooltip in Summary
+    const gtDefects = {
+        cavity: data.reduce((s, r) => s + (r.cavity || 0), 0),
+        cracks: data.reduce((s, r) => s + (r.cracks || 0), 0),
+        rCracks: data.reduce((s, r) => s + (r.rCracks || 0), 0),
+        ovality: data.reduce((s, r) => s + (r.ovality || 0), 0),
+        others: data.reduce((s, r) => s + (r.others || 0), 0)
+    };
+
     let srNo = 1;
     sortedGroups.forEach(group => {
         const rejPct = group.totalWt > 0 ? ((group.rejectedWt / group.totalWt) * 100).toFixed(2) : '0.00';
@@ -1152,11 +1170,11 @@ function renderQualitySummary() {
         <td colspan="2"><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
-        <td><strong>${gtRej}</strong></td>
+        <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${gtRej}</strong></td>
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${gtRateClass}">${gtRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated on Weight (Kg.)">${gtRejPct}%</span></strong></td>
     `;
     tbody.appendChild(gtRow);
 }
