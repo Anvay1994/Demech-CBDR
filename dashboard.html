@@ -53,15 +53,15 @@
         <!-- ========== FILTERS BAR ========== -->
         <div class="main-content">
             <div class="filters-bar">
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupDateFrom">
                     <label>Date From</label>
                     <input type="date" id="filterDateFrom" onchange="applyFilters()">
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupDateTo">
                     <label>Date To</label>
                     <input type="date" id="filterDateTo" onchange="applyFilters()">
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupShift">
                     <label>Shift</label>
                     <select id="filterShift" onchange="applyFilters()">
                         <option value="all">All Shifts</option>
@@ -70,25 +70,25 @@
                         <option value="III">Shift III</option>
                     </select>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupSupervisor">
                     <label>Prod Supervisor</label>
                     <select id="filterSupervisor" onchange="applyFilters()">
                         <option value="all">All Supervisors</option>
                     </select>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupQCName">
                     <label>QC Supervisor</label>
                     <select id="filterQCName" onchange="applyFilters()">
                         <option value="all">All Supervisors</option>
                     </select>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupPipeSize">
                     <label>Pipe Size</label>
                     <select id="filterPipeSize" onchange="applyFilters()">
                         <option value="all">All Sizes</option>
                     </select>
                 </div>
-                <div class="filter-group">
+                <div class="filter-group" id="filterGroupTrolley">
                     <label>Trolley No.</label>
                     <select id="filterTrolley" onchange="applyFilters()">
                         <option value="all">All Trolleys</option>

@@ -2480,7 +2480,16 @@ function switchTab(tabName) {
     // Hide filters bar on Daily & Summary tabs (they have their own date pickers)
     const filtersBar = document.querySelector('.filters-bar');
     if (filtersBar) {
-        filtersBar.style.display = (tabName === 'daily' || tabName === 'summary') ? 'none' : 'flex';
+        const isExcludedTab = (tabName === 'daily' || tabName === 'summary');
+        filtersBar.style.display = isExcludedTab ? 'none' : 'flex';
+
+        // Dynamic Filter Groups (only if bar is visible)
+        if (!isExcludedTab) {
+            const groupQC = document.getElementById('filterGroupQCName');
+            if (groupQC) groupQC.style.display = (tabName === 'production') ? 'none' : 'flex';
+            
+            // Note: Quality tab keeps all filters as requested by client
+        }
     }
 
     // Re-render the active tab content
