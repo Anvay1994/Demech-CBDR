@@ -431,27 +431,34 @@
 
                 <!-- Controls: Period & Month/Year -->
                 <div class="daily-controls">
-                    <div class="daily-selectors">
-                        <div class="tab-group">
+                    <div class="daily-date-picker">
+                        <div class="tab-group" style="margin-right: 1.5rem;">
                             <button class="tab-btn active" id="btnSummaryMonthly" onclick="setSummaryPeriod('monthly')">Monthly</button>
                             <button class="tab-btn" id="btnSummaryYearly" onclick="setSummaryPeriod('yearly')">Yearly (FY)</button>
                         </div>
-                        
-                        <div id="summaryMonthPicker">
-                            <input type="month" id="summaryMonth" class="date-input" onchange="renderSummaryReport()">
-                        </div>
-                        <div id="summaryYearPicker" style="display:none;">
-                            <select id="summaryYear" class="date-input" style="width:140px;" onchange="renderSummaryReport()">
-                                <option value="26-27">FY 2026-27</option>
-                            </select>
-                        </div>
                     </div>
 
-                    <div class="daily-selectors">
-                        <div class="tab-group secondary">
-                            <button class="tab-btn active" id="btnSummaryProd" onclick="switchSummaryView('production')">📑 Production</button>
-                            <button class="tab-btn" id="btnSummaryQual" onclick="switchSummaryView('quality')">🔍 Quality</button>
-                        </div>
+                    <div class="daily-date-picker" id="summaryMonthPicker">
+                        <label>Select Month</label>
+                        <input type="month" id="summaryMonth" class="date-input" onchange="renderSummaryReport()">
+                    </div>
+                    <div class="daily-date-picker" id="summaryYearPicker" style="display:none;">
+                        <label>Select Year</label>
+                        <select id="summaryYear" class="date-input" style="width:140px;" onchange="renderSummaryReport()">
+                            <option value="26-27">FY 2026-27</option>
+                        </select>
+                    </div>
+
+                    <div class="daily-sub-tabs" style="margin-left: 1rem;">
+                        <button class="daily-sub-tab active" id="btnSummaryProd" onclick="switchSummaryView('production')">🏭 Production</button>
+                        <button class="daily-sub-tab" id="btnSummaryQual" onclick="switchSummaryView('quality')">🔍 Quality</button>
+                    </div>
+
+                    <div id="summaryProdQcToggleArea" style="display: flex; align-items: center; margin-left: auto;">
+                        <label class="qc-toggle-label" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; user-select: none;">
+                            <input type="checkbox" id="toggleSummaryQc" onchange="renderSummaryReport()" style="cursor: pointer; width: 15px; height: 15px;" checked> 
+                            Show QC Data
+                        </label>
                     </div>
                 </div>
 

@@ -2252,8 +2252,13 @@ function setSummaryPeriod(period) {
 
 function switchSummaryView(view) {
     summaryView = view;
-    document.querySelectorAll('#section-summary .tab-group.secondary .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#section-summary .daily-sub-tab').forEach(b => b.classList.remove('active'));
     document.getElementById(view === 'production' ? 'btnSummaryProd' : 'btnSummaryQual')?.classList.add('active');
+    
+    // Show/Hide QC toggle area based on view
+    const toggleArea = document.getElementById('summaryProdQcToggleArea');
+    if (toggleArea) toggleArea.style.display = view === 'production' ? 'flex' : 'none';
+    
     renderSummaryReport();
 }
 
@@ -2361,11 +2366,15 @@ function renderSummaryReport() {
     `;
 
     // Render Table
+    const showQC = document.getElementById('toggleSummaryQc')?.checked;
+    const isQualView = summaryView === 'quality';
+    const displayQC = isQualView || (summaryView === 'production' && showQC);
+
     let tableHtml = `<div class="report-table-wrapper" style="overflow-x: auto;">
-        <table class="report-table" style="min-width: 1400px;">
+        <table class="report-table" style="min-width: ${displayQC ? '1400px' : '100%'};">
             <thead><tr>
                 <th>Sr.</th><th>Pipe Size</th><th>Unit Wt</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>
-                ${summaryView === 'quality' ? '<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>' : ''}
+                ${displayQC ? '<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>' : ''}
             </tr></thead><tbody>`;
 
     sortedPipes.forEach((p, idx) => {
@@ -2378,7 +2387,7 @@ function renderSummaryReport() {
             <td>${p.unitWt}</td>
             <td>${p.qty}</td>
             <td>${p.wt.toFixed(1)}</td>
-            ${summaryView === 'quality' ? `
+            ${displayQC ? `
                 <td>${p.acc}</td>
                 <td class="badge-rejected" data-tooltip="${getRejectionTooltip(p)}">${p.rej}</td>
                 <td>${p.accWt.toFixed(1)}</td>
@@ -2406,7 +2415,7 @@ function renderSummaryReport() {
         <td colspan="3" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
         <td><strong>${totalQty}</strong></td>
         <td><strong>${totalWt.toFixed(1)}</strong></td>
-        ${summaryView === 'quality' ? `
+        ${displayQC ? `
             <td><strong>${totalAcc}</strong></td>
             <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${totalRej}</strong></td>
             <td><strong>${periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0).toFixed(1)}</strong></td>
