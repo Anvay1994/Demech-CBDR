@@ -25,6 +25,8 @@ let shiftLevelData = [];
 let filteredData = [];
 let currentTab = 'dashboard';
 let dailySubTab = 'production';
+let summaryPeriod = 'monthly';
+let summaryView = 'production';
 
 // ============ AUTH CHECK ============
 function checkAuth() {
@@ -1757,6 +1759,8 @@ function renderAll() {
         renderCharts();
     } else if (currentTab === 'daily') {
         renderDailyReport();
+    } else if (currentTab === 'summary') {
+        renderSummaryReport();
     } else if (currentTab === 'production') {
         renderProductionReport();
         renderProductionSummary();
@@ -2234,6 +2238,218 @@ function exportMonthlyCSV() {
     showToast(`Monthly summary for ${monthLabel} downloaded!`, 'success');
 }
 
+// ============ SUMMARY REPORTS (MONTHLY/YEARLY) ============
+function setSummaryPeriod(period) {
+    summaryPeriod = period;
+    document.querySelectorAll('#section-summary .tab-btn').forEach(b => {
+        if (b.onclick.toString().includes('setSummaryPeriod')) b.classList.remove('active');
+    });
+    document.getElementById(period === 'monthly' ? 'btnSummaryMonthly' : 'btnSummaryYearly')?.classList.add('active');
+    document.getElementById('summaryMonthPicker').style.display = period === 'monthly' ? 'block' : 'none';
+    document.getElementById('summaryYearPicker').style.display = period === 'yearly' ? 'block' : 'none';
+    renderSummaryReport();
+}
+
+function switchSummaryView(view) {
+    summaryView = view;
+    document.querySelectorAll('#section-summary .tab-group.secondary .tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(view === 'production' ? 'btnSummaryProd' : 'btnSummaryQual')?.classList.add('active');
+    renderSummaryReport();
+}
+
+/**
+ * Main rendering for Monthly/Yearly summary
+ */
+function renderSummaryReport() {
+    const container = document.getElementById('summaryContent');
+    const kpiEl = document.getElementById('summaryKPI');
+    if (!container || !kpiEl) return;
+
+    let periodData = [];
+    let periodLabel = '';
+
+    if (summaryPeriod === 'monthly') {
+        const val = document.getElementById('summaryMonth').value;
+        if (!val) { container.innerHTML = '<div class="empty-state">Select a month</div>'; return; }
+        const [year, month] = val.split('-');
+        periodData = allData.filter(r => {
+            const parts = (r.qcDate || r.date).split('-');
+            return parts[1] === month && parts[2] === year;
+        });
+        const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        periodLabel = `${monthNames[parseInt(month)-1]} ${year}`;
+    } else {
+        const val = document.getElementById('summaryYear').value; // e.g. "26-27"
+        periodData = allData.filter(r => {
+            const parts = (r.qcDate || r.date).split('-');
+            if (parts.length < 3) return false;
+            const yearStr = parts[2].substring(2); // "26"
+            const monthInt = parseInt(parts[1]);
+            // Simple FY logic for 26-27 (Apr 26 to Mar 27)
+            if (val === '26-27') {
+                if (yearStr === '26' && monthInt >= 4) return true;
+                if (yearStr === '27' && monthInt <= 3) return true;
+            }
+            return false;
+        });
+        periodLabel = `FY 20${val}`;
+    }
+
+    if (periodData.length === 0) {
+        container.innerHTML = `<div class="empty-state">No data found for ${periodLabel}</div>`;
+        kpiEl.innerHTML = '';
+        return;
+    }
+
+    // Aggregate by Pipe Size
+    const pipeMap = {};
+    periodData.forEach(r => {
+        const ps = r.pipeSize || '—';
+        if (!pipeMap[ps]) {
+            pipeMap[ps] = { 
+                pipeSize: ps, qty: 0, wt: 0, unitWt: r.wtPerPipe,
+                acc: 0, rej: 0, accWt: 0, rejWt: 0,
+                cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0
+            };
+        }
+        const p = pipeMap[ps];
+        p.qty += r.totalPipes;
+        p.wt += r.totalWt;
+        if (r.status === 'QC Checked') {
+            p.acc += r.accepted;
+            p.rej += r.rejected;
+            p.accWt += r.acceptedWt;
+            p.rejWt += r.rejectedWt;
+            p.cavity += (r.cavity || 0);
+            p.cracks += (r.cracks || 0);
+            p.rCracks += (r.rCracks || 0);
+            p.ovality += (r.ovality || 0);
+            p.others += (r.others || 0);
+        }
+    });
+
+    const sortedPipes = Object.values(pipeMap).sort((a,b) => a.pipeSize.localeCompare(b.pipeSize));
+    
+    // Render KPIs
+    const totalQty = periodData.reduce((s,r) => s + r.totalPipes, 0);
+    const totalWt = periodData.reduce((s,r) => s + r.totalWt, 0);
+    const totalRej = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejected : 0), 0);
+    const totalAcc = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.accepted : 0), 0);
+    const rejPct = totalQty > 0 ? ((totalRej/totalQty)*100).toFixed(1) : '0.0';
+
+    kpiEl.innerHTML = `
+        <div class="kpi-card blue">
+            <div class="kpi-label">Total Produced</div>
+            <div class="kpi-value">${totalQty}</div>
+            <div class="kpi-sub">pipes in ${periodLabel}</div>
+        </div>
+        <div class="kpi-card green">
+            <div class="kpi-label">Accepted (Nos)</div>
+            <div class="kpi-value">${totalAcc}</div>
+            <div class="kpi-sub">quality checked</div>
+        </div>
+        <div class="kpi-card red">
+            <div class="kpi-label">Rejected (Nos)</div>
+            <div class="kpi-value">${totalRej}</div>
+            <div class="kpi-sub">${rejPct}% rejection rate</div>
+        </div>
+        <div class="kpi-card amber">
+            <div class="kpi-label">Weight Produced</div>
+            <div class="kpi-value">${(totalWt/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">Total Metric Tons</div>
+        </div>
+    `;
+
+    // Render Table
+    let tableHtml = `<div class="report-table-wrapper" style="overflow-x: auto;">
+        <table class="report-table" style="min-width: 1400px;">
+            <thead><tr>
+                <th>Sr.</th><th>Pipe Size</th><th>Unit Wt</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>
+                ${summaryView === 'quality' ? '<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>' : ''}
+            </tr></thead><tbody>`;
+
+    sortedPipes.forEach((p, idx) => {
+        const rp = p.qty > 0 ? ((p.rej / p.qty) * 100).toFixed(1) : '0.0';
+        const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+        
+        tableHtml += `<tr>
+            <td>${idx + 1}</td>
+            <td><strong>${p.pipeSize}</strong></td>
+            <td>${p.unitWt}</td>
+            <td>${p.qty}</td>
+            <td>${p.wt.toFixed(1)}</td>
+            ${summaryView === 'quality' ? `
+                <td>${p.acc}</td>
+                <td class="badge-rejected" data-tooltip="${getRejectionTooltip(p)}">${p.rej}</td>
+                <td>${p.accWt.toFixed(1)}</td>
+                <td>${p.rejWt.toFixed(1)}</td>
+                <td>${p.cavity || ''}</td>
+                <td>${p.cracks || ''}</td>
+                <td>${p.rCracks || ''}</td>
+                <td>${p.ovality || ''}</td>
+                <td>${p.others || ''}</td>
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+            ` : ''}
+        </tr>`;
+    });
+
+    // Grand Totals Row
+    const gtDefects = {
+        cavity: sortedPipes.reduce((s,p) => s + p.cavity, 0),
+        cracks: sortedPipes.reduce((s,p) => s + p.cracks, 0),
+        rCracks: sortedPipes.reduce((s,p) => s + p.rCracks, 0),
+        ovality: sortedPipes.reduce((s,p) => s + p.ovality, 0),
+        others: sortedPipes.reduce((s,p) => s + p.others, 0)
+    };
+
+    tableHtml += `<tr class="grand-total-row">
+        <td colspan="3" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
+        <td><strong>${totalQty}</strong></td>
+        <td><strong>${totalWt.toFixed(1)}</strong></td>
+        ${summaryView === 'quality' ? `
+            <td><strong>${totalAcc}</strong></td>
+            <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${totalRej}</strong></td>
+            <td><strong>${periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0).toFixed(1)}</strong></td>
+            <td><strong>${periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejectedWt : 0), 0).toFixed(1)}</strong></td>
+            <td><strong>${gtDefects.cavity || ''}</strong></td>
+            <td><strong>${gtDefects.cracks || ''}</strong></td>
+            <td><strong>${gtDefects.rCracks || ''}</strong></td>
+            <td><strong>${gtDefects.ovality || ''}</strong></td>
+            <td><strong>${gtDefects.others || ''}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+        ` : ''}
+    </tr></tbody></table></div>`;
+
+    container.innerHTML = tableHtml;
+}
+
+async function exportSummaryCSV() {
+    const val = summaryPeriod === 'monthly' ? document.getElementById('summaryMonth').value : document.getElementById('summaryYear').value;
+    if (!val) return;
+    
+    // Simple logic: we'll export what is currently being viewed in the summary table
+    const pipeTable = document.querySelector('#summaryContent table');
+    if (!pipeTable) return;
+
+    let csv = 'sep=,\r\n';
+    const headers = [];
+    pipeTable.querySelectorAll('thead th').forEach(th => headers.push(th.textContent));
+    csv += headers.map(csvSafe).join(',') + '\r\n';
+
+    pipeTable.querySelectorAll('tbody tr').forEach(tr => {
+        const row = [];
+        tr.querySelectorAll('td').forEach(td => row.push(td.textContent.replace('%', '')));
+        csv += row.map(csvSafe).join(',') + '\r\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Demech_${summaryPeriod}_Summary_${val}_${summaryView}.csv`;
+    link.click();
+    showToast(`Summary exported successfully!`, 'success');
+}
+
 // ============ TAB NAVIGATION ============
 function switchTab(tabName) {
     currentTab = tabName;
@@ -2246,9 +2462,11 @@ function switchTab(tabName) {
     document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
     document.getElementById(`section-${tabName}`)?.classList.add('active');
 
-    // Hide filters bar on Daily Report tab (it has its own date picker)
+    // Hide filters bar on Daily & Summary tabs (they have their own date pickers)
     const filtersBar = document.querySelector('.filters-bar');
-    if (filtersBar) filtersBar.style.display = tabName === 'daily' ? 'none' : '';
+    if (filtersBar) {
+        filtersBar.style.display = (tabName === 'daily' || tabName === 'summary') ? 'none' : 'flex';
+    }
 
     // Re-render the active tab content
     renderAll();
@@ -2263,7 +2481,11 @@ function csvSafe(val) {
 }
 
 function exportCSV(reportType) {
-    const data = filteredData;
+    if (reportType === 'summary') {
+        exportSummaryCSV();
+        return;
+    }
+    const data = (reportType === 'dataquality') ? filteredData : (reportType === 'quality' ? filteredData.filter(r => r.status === 'QC Checked') : filteredData);
     // Start with 'sep=,' to force Excel to use comma regardless of regional settings
     let csvContent = 'sep=,\r\n';
 
@@ -2706,6 +2928,13 @@ async function initApp() {
         // Apply filters (will use default date range)
         applyFilters();
         renderDataQuality();
+
+        // Set default month for summary
+        const summaryMonthInput = document.getElementById('summaryMonth');
+        if (summaryMonthInput && !summaryMonthInput.value) {
+            const now = new Date();
+            summaryMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
 
         const flagCount = dataQualityFlags.length;
         const msg = flagCount > 0

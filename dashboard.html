@@ -43,6 +43,7 @@
         <div class="page-tabs">
             <div class="page-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
             <div class="page-tab" data-tab="daily" onclick="switchTab('daily')">📅 Daily Report</div>
+            <div class="page-tab" data-tab="summary" onclick="switchTab('summary')">📈 Summaries</div>
             <div class="page-tab" data-tab="production" onclick="switchTab('production')">📋 Production Report</div>
             <div class="page-tab" data-tab="quality" onclick="switchTab('quality')">🔍 Quality Report</div>
             <div class="page-tab" data-tab="dataquality" onclick="switchTab('dataquality')">⚠ Data Quality <span
@@ -415,6 +416,50 @@
                         </table>
                     </div>
                 </div>
+            </div>
+            
+            <!-- ===================================================
+           SECTION: SUMMARIES (Monthly / Yearly)
+           =================================================== -->
+            <div id="section-summary" class="page-section">
+                <div class="section-header">
+                    <h3>📈 Pipe-wise Summaries</h3>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <button class="btn btn-secondary btn-sm" onclick="exportCSV('summary')">⬇ Export CSV</button>
+                    </div>
+                </div>
+
+                <!-- Controls: Period & Month/Year -->
+                <div class="daily-controls">
+                    <div class="daily-selectors">
+                        <div class="tab-group">
+                            <button class="tab-btn active" id="btnSummaryMonthly" onclick="setSummaryPeriod('monthly')">Monthly</button>
+                            <button class="tab-btn" id="btnSummaryYearly" onclick="setSummaryPeriod('yearly')">Yearly (FY)</button>
+                        </div>
+                        
+                        <div id="summaryMonthPicker">
+                            <input type="month" id="summaryMonth" class="date-input" onchange="renderSummaryReport()">
+                        </div>
+                        <div id="summaryYearPicker" style="display:none;">
+                            <select id="summaryYear" class="date-input" style="width:140px;" onchange="renderSummaryReport()">
+                                <option value="26-27">FY 2026-27</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="daily-selectors">
+                        <div class="tab-group secondary">
+                            <button class="tab-btn active" id="btnSummaryProd" onclick="switchSummaryView('production')">📑 Production</button>
+                            <button class="tab-btn" id="btnSummaryQual" onclick="switchSummaryView('quality')">🔍 Quality</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 24-hr style Summary Cards -->
+                <div id="summaryKPI" class="kpi-grid" style="margin-bottom:1.5rem;"></div>
+
+                <!-- Main Content (Tables) -->
+                <div id="summaryContent"></div>
             </div>
 
         </div><!-- end .main-content -->
