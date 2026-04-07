@@ -671,10 +671,15 @@ function populateFilterOptions() {
 // ============ KPI RENDERING ============
 function renderKPIs() {
     const data = filteredData;
+    const totalPipes = data.reduce((s, r) => s + (r.totalPipes || 0), 0);
+    const totalWt = data.reduce((s, r) => s + (r.totalWt || 0), 0);
+    const totalAccepted = data.reduce((s, r) => s + (r.status === 'QC Checked' ? r.accepted : 0), 0);
+    const totalRejected = data.reduce((s, r) => s + (r.status === 'QC Checked' ? r.rejected : 0), 0);
     const totalAcceptedWt = data.reduce((s, r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0);
     const totalRejectedWt = data.reduce((s, r) => s + (r.status === 'QC Checked' ? r.rejectedWt : 0), 0);
-    const acceptPct = totalWt > 0 ? ((totalAcceptedWt / totalWt) * 100).toFixed(1) : '0.0';
-    const rejectPct = totalWt > 0 ? ((totalRejectedWt / totalWt) * 100).toFixed(1) : '0.0';
+    const totalWtCalc = totalAcceptedWt + totalRejectedWt;
+    const acceptPct = totalWtCalc > 0 ? ((totalAcceptedWt / totalWtCalc) * 100).toFixed(1) : '0.0';
+    const rejectPct = totalWtCalc > 0 ? ((totalRejectedWt / totalWtCalc) * 100).toFixed(1) : '0.0';
 
     document.getElementById('kpiTotalPipes').textContent = totalPipes.toLocaleString('en-IN');
     document.getElementById('kpiAcceptRate').textContent = acceptPct + '%';
