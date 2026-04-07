@@ -777,13 +777,13 @@ function renderProductionReport() {
         <td>${totalWt.toFixed(1)}</td>
         <td>${acceptedWt.toFixed(1)}</td>
         <td>${rejectedWt.toFixed(1)}</td>
-        <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated on Quantity (Nos.)">${pipe.rejectedPct}</span></td>
+        <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${pipe.rejectedPct}</span></td>
       `;
             tbody.appendChild(tr);
         });
 
         // Subtotal row
-        const stRejPct = stQty > 0 ? ((stRej / stQty) * 100).toFixed(1) : '0.0';
+        const stRejPct = stTotalWt > 0 ? ((stRejWt / stTotalWt) * 100).toFixed(1) : '0.0';
         const stRateClass = parseFloat(stRejPct) > 30 ? 'danger' : parseFloat(stRejPct) > 15 ? 'warning' : 'good';
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
@@ -799,7 +799,7 @@ function renderProductionReport() {
         <td><strong>${stTotalWt.toFixed(1)}</strong></td>
         <td><strong>${stAccWt.toFixed(1)}</strong></td>
         <td><strong>${stRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${stRateClass}" data-tooltip="Calculated on Quantity (Nos.)">${stRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${stRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${stRejPct}%</span></strong></td>
       `;
         tbody.appendChild(stRow);
 
@@ -815,7 +815,7 @@ function renderProductionReport() {
     });
 
     // Grand Total row
-    const gtRejPct = gtQty > 0 ? ((gtRej / gtQty) * 100).toFixed(1) : '0.0';
+    const gtRejPct = gtTotalWt > 0 ? ((gtRejWt / gtTotalWt) * 100).toFixed(1) : '0.0';
     const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
@@ -836,7 +836,7 @@ function renderProductionReport() {
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${gtRejPct}%" data-tooltip="Calculated on Quantity (Nos.)">${gtRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${gtRejPct}%</span></strong></td>
       `;
     tbody.appendChild(gtRow);
 
@@ -1032,12 +1032,12 @@ function renderQualityReport() {
                 <td>${totalWt.toFixed(1)}</td>
                 <td>${acceptedWt.toFixed(1)}</td>
                 <td>${rejectedWt.toFixed(1)}</td>
-                <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated on Quantity (Nos.)">${pipe.rejectedPct}</span></td>
+                <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${pipe.rejectedPct}</span></td>
             `;
             tbody.appendChild(tr);
         });
 
-        const stRejPct = stQty > 0 ? ((stRej / stQty) * 100).toFixed(1) : '0.0';
+        const stRejPct = stTotalWt > 0 ? ((stRejWt / stTotalWt) * 100).toFixed(1) : '0.0';
         const stRateClass = parseFloat(stRejPct) > 30 ? 'danger' : parseFloat(stRejPct) > 15 ? 'warning' : 'good';
         const stRow = document.createElement('tr');
         stRow.classList.add('subtotal-row');
@@ -1056,13 +1056,13 @@ function renderQualityReport() {
             <td><strong>${stTotalWt.toFixed(1)}</strong></td>
             <td><strong>${stAccWt.toFixed(1)}</strong></td>
             <td><strong>${stRejWt.toFixed(1)}</strong></td>
-            <td><strong><span class="badge-rate ${stRateClass}" data-tooltip="Calculated on Quantity (Nos.)">${stRejPct}%</span></strong></td>
+            <td><strong><span class="badge-rate ${stRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${stRejPct}%</span></strong></td>
         `;
         tbody.appendChild(stRow);
         srNo++;
     });
 
-    const gtRejPct = gtQty > 0 ? ((gtRej / gtQty) * 100).toFixed(1) : '0.0';
+    const gtRejPct = gtTotalWt > 0 ? ((gtRejWt / gtTotalWt) * 100).toFixed(1) : '0.0';
     const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
@@ -1076,7 +1076,7 @@ function renderQualityReport() {
         <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
         <td><strong>${gtAccWt.toFixed(1)}</strong></td>
         <td><strong>${gtRejWt.toFixed(1)}</strong></td>
-        <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated on Quantity (Nos.)">${gtRejPct}%</span></strong></td>
+        <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${gtRejPct}%</span></strong></td>
     `;
     tbody.appendChild(gtRow);
 
