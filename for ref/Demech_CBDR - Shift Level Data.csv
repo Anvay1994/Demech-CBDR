@@ -1,0 +1,28 @@
+ID,Date_Shift,Date_Shift_Supervisor ,Date,Shift,Supervisor,Number of batch,BS_Composition,Input KG_BS,L1_Composition,Input KG_L1,L2_Composition,Input KG_L2,RR_Composition,Input KG_RR,Labour_Amount,Furnace Num,Remark
+6ba45705,46106_l,25-03-2026_l_Khalate H.S.,25-03-2026,l,Khalate H.S.,40,100,4000,10,400,2,80,75,3000,,,
+0347b1a3,46103_l,22-03-2026_l_Chavan S.D.,22-03-2026,l,Chavan S.D.,39,100,3900,10,390,2,78,75,2925,,F2,
+f65206cd,46107_l,26-03-2026_l_Anvay Testing,26-03-2026,l,Anvay Testing,40,100,4000,1,40,10,400,75,3000,,F2,
+135c2adb,46108_l,27-03-2026_l_Khalate H.S.,27-03-2026,l,Khalate H.S.,36,100,3600,10,360,2,72,75,2700,,F2,T kiln set pt change from 815°c to 810°c at 10:30 as per kale sir inst.
+63b5c001,46082_l,01-03-2026_l_Biradar H.K.,01-03-2026,l,Biradar H.K.,,100,0,9,0,2,0,46,0,,F1,
+cb679420,46082_lll,01-03-2026_lll_Bankar D.M.,01-03-2026,lll,Bankar D.M.,39,100,3900,9,351,2,78,46,1794,,F1,
+9e3cde87,46108_lll,27-03-2026_lll_Pawar A.A,27-03-2026,lll,Pawar A.A,39,100,3900,10,390,2,78,75,2925,,F2,
+,,,,,,,,,,,,,,,,,
+605dcc1d,46109_ll,28-03-2026_ll_Bankar D.M.,28-03-2026,ll,Bankar D.M.,54,100,5400,10,540,2,108,75,4050,,F2,
+,,,,,,,,,,,,,,,,,
+2ddee714,46109_lll,28-03-2026_lll_Pawar A.A,28-03-2026,lll,Pawar A.A,39,100,3900,10,390,2,78,75,2925,,F2,
+99767965,46109_l,28-03-2026_l_Dhumal K.V.,28-03-2026,l,Dhumal K.V.,51,100,5100,10,510,2,102,75,3825,,F2,3-4 times electricity failure in a shift.
+990ae013,46110_l,29-03-2026_l_Dhumal K.V.,29-03-2026,l,Dhumal K.V.,48,100,4800,10,480,2,96,75,3600,,F2,T-kiln set point change from 810 to 805 at 09:30 AM from trolley number 26 as per YPK sir instructions.
+2979aa09,46110_ll,29-03-2026_ll_Bankar D.M.,29-03-2026,ll,Bankar D.M.,39,100,3900,10,390,2,78,75,2925,,F2,
+,,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,,
+4206bf9f,46110_lll,29-03-2026_lll_Chavan S.D.,29-03-2026,lll,Chavan S.D.,39,100,3900,10,390,2,78,75,2925,,F2,
+6dd5caf3,46111_l,30-03-2026_l_Dhumal K.V.,30-03-2026,l,Dhumal K.V.,48,100,4800,10,480,2,96,75,3600,,F2,Pipe pushing remote off at 12.30 pm. All pushers operated as manual on track.
+676d6f9b,46111_ll,30-03-2026_ll_Bankar D.M.,30-03-2026,ll,Bankar D.M.,51,100,5100,10,510,2,102,75,3825,,F2,
+,,,,,,,,,,,,,,,,,
+3b0ce8eb,46112_,31-03-2026__,31-03-2026,,,,,0,,0,,0,,0,,,
+0222916f,46111_lll,30-03-2026_lll_Chavan S.D.,30-03-2026,lll,Chavan S.D.,39,100,3900,10,390,2,78,75,2925,,F2,
+05e9cae9,46112_l,31-03-2026_l_Dhumal K.V.,31-03-2026,l,Dhumal K.V.,48,100,4800,10,480,2,96,75,3600,,F2,T kiln set point 800 at 9:50 AM as per instructions y.p. kale sir.
+1a747969,46112_ll,31-03-2026_ll_Pawar A.A,31-03-2026,ll,Pawar A.A,39,100,3900,10,390,2,78,75,2925,,F2,
+8941b154,46112_lll,31-03-2026_lll_Chavan S.D.,31-03-2026,lll,Chavan S.D.,48,100,4800,10,480,2,96,75,3600,,F2,
+3680bb1a,46113_l,01-04-2026_l_Dhumal K.V.,01-04-2026,l,Dhumal K.V.,39,100,3900,10,390,2,78,75,2925,,F2,
+c8103b3f,46113_ll,01-04-2026_ll_Bankar D.M.,01-04-2026,ll,Bankar D.M.,,100,0,10,0,2,0,75,0,,F2,

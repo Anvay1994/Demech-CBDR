@@ -122,10 +122,10 @@
                         <div class="kpi-value" id="kpiAcceptRate">—</div>
                         <div class="kpi-sub">of total production</div>
                     </div>
-                    <div class="kpi-card red">
+                    <div class="kpi-card red" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">
                         <div class="kpi-label">Rejection Rate</div>
                         <div class="kpi-value" id="kpiRejectRate">—</div>
-                        <div class="kpi-sub">needs attention if &gt; 15%</div>
+                        <div class="kpi-sub">by total weight in kg</div>
                     </div>
                     <div class="kpi-card amber">
                         <div class="kpi-label">Total Weight</div>
@@ -332,6 +332,7 @@
                             <thead>
                                 <tr>
                                     <th>Sr.No.</th>
+                                    <th>SHIFT</th>
                                     <th>QC NAME</th>
                                     <th>TOTAL QTY</th>
                                     <th>ACCEPT (NOS)</th>

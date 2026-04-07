@@ -397,8 +397,8 @@ function transformReportData(rawData) {
 
     // Calculate percentages after aggregation
     const aggregated = Object.values(aggMap).map(r => {
-        const rejPct = r.totalPipes > 0 ? ((r.rejected / r.totalPipes) * 100).toFixed(1) + '%' : '0.0%';
-        const accPct = r.totalPipes > 0 ? ((r.accepted / r.totalPipes) * 100).toFixed(1) + '%' : '0.0%';
+        const rejPct = r.totalWt > 0 ? ((r.rejectedWt / r.totalWt) * 100).toFixed(1) + '%' : '0.0%';
+        const accPct = r.totalWt > 0 ? ((r.acceptedWt / r.totalWt) * 100).toFixed(1) + '%' : '0.0%';
         return { ...r, qcName: [...r.qcNames].join(', '), status: [...(r.statuses || [])].join(', '), rejectedPct: rejPct, acceptedPct: accPct };
     });
 
@@ -671,12 +671,10 @@ function populateFilterOptions() {
 // ============ KPI RENDERING ============
 function renderKPIs() {
     const data = filteredData;
-    const totalPipes = data.reduce((s, r) => s + r.totalPipes, 0);
-    const totalAccepted = data.reduce((s, r) => s + r.accepted, 0);
-    const totalRejected = data.reduce((s, r) => s + r.rejected, 0);
-    const totalWt = data.reduce((s, r) => s + r.totalWt, 0);
-    const acceptPct = totalPipes > 0 ? ((totalAccepted / totalPipes) * 100).toFixed(1) : '0.0';
-    const rejectPct = totalPipes > 0 ? ((totalRejected / totalPipes) * 100).toFixed(1) : '0.0';
+    const totalAcceptedWt = data.reduce((s, r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0);
+    const totalRejectedWt = data.reduce((s, r) => s + (r.status === 'QC Checked' ? r.rejectedWt : 0), 0);
+    const acceptPct = totalWt > 0 ? ((totalAcceptedWt / totalWt) * 100).toFixed(1) : '0.0';
+    const rejectPct = totalWt > 0 ? ((totalRejectedWt / totalWt) * 100).toFixed(1) : '0.0';
 
     document.getElementById('kpiTotalPipes').textContent = totalPipes.toLocaleString('en-IN');
     document.getElementById('kpiAcceptRate').textContent = acceptPct + '%';
@@ -873,7 +871,7 @@ function renderProductionSummary() {
 
     let srNo = 1;
     Object.values(supGroups).sort((a, b) => a.supervisor.localeCompare(b.supervisor)).forEach(group => {
-        const rejPct = group.totalPipes > 0 ? ((group.rejected / group.totalPipes) * 100).toFixed(1) : '0.0';
+        const rejPct = group.totalWt > 0 ? ((group.rejectedWt / group.totalWt) * 100).toFixed(1) : '0.0';
         const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
         const tr = document.createElement('tr');
@@ -886,7 +884,7 @@ function renderProductionSummary() {
             <td>${group.totalWt.toFixed(1)}</td>
             <td>${group.acceptedWt.toFixed(1)}</td>
             <td>${group.rejectedWt.toFixed(1)}</td>
-            <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated on Quantity (Nos.)">${rejPct}%</span></td>
+            <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></td>
         `;
         tbody.appendChild(tr);
     });
@@ -1089,16 +1087,20 @@ function renderQualitySummary() {
     const tbody = document.getElementById('qualSummaryBody');
     tbody.innerHTML = '';
 
-    // Group purely by QC Name for aggregate summary (split comma-separated names)
+    // Group by Name and Shift for aggregate summary (split comma-separated names)
     const groups = {};
     data.forEach(row => {
         const names = (row.qcName || '—').split(',').map(n => n.trim()).filter(n => n);
         if (names.length === 0) names.push('—');
 
+        const shift = row.qcShift || '—';
+
         names.forEach(qc => {
-            if (!groups[qc]) {
-                groups[qc] = {
+            const key = `${qc}|${shift}`;
+            if (!groups[key]) {
+                groups[key] = {
                     qcName: qc,
+                    shift: shift,
                     totalPipes: 0,
                     accepted: 0,
                     rejected: 0,
@@ -1108,21 +1110,27 @@ function renderQualitySummary() {
                     cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0
                 };
             }
-            groups[qc].totalPipes += row.totalPipes;
-            groups[qc].accepted += row.accepted;
-            groups[qc].rejected += row.rejected;
-            groups[qc].totalWt += row.totalWt;
-            groups[qc].acceptedWt += row.acceptedWt;
-            groups[qc].rejectedWt += row.rejectedWt;
-            groups[qc].cavity += row.cavity;
-            groups[qc].cracks += row.cracks;
-            groups[qc].rCracks += row.rCracks;
-            groups[qc].ovality += row.ovality;
-            groups[qc].others += row.others;
+            groups[key].totalPipes += row.totalPipes;
+            groups[key].accepted += row.accepted;
+            groups[key].rejected += row.rejected;
+            groups[key].totalWt += row.totalWt;
+            groups[key].acceptedWt += row.acceptedWt;
+            groups[key].rejectedWt += row.rejectedWt;
+            groups[key].cavity += row.cavity;
+            groups[key].cracks += row.cracks;
+            groups[key].rCracks += row.rCracks;
+            groups[key].ovality += row.ovality;
+            groups[key].others += row.others;
         });
     });
 
-    const sortedGroups = Object.values(groups).sort((a, b) => a.qcName.localeCompare(b.qcName));
+    const shiftMap = { 'I': 1, 'II': 2, 'III': 3 };
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+        const sA = shiftMap[a.shift] || 99;
+        const sB = shiftMap[b.shift] || 99;
+        if (sA !== sB) return sA - sB;
+        return a.qcName.localeCompare(b.qcName);
+    });
 
     // Calculate Grand Totals from raw data to avoid double-counting unrolled names
     const gtQty = data.reduce((s, r) => s + r.totalPipes, 0);
@@ -1149,6 +1157,7 @@ function renderQualitySummary() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
       <td>${srNo}</td>
+      <td style="text-align:center;"><span class="badge-shift sh-${group.shift}">${group.shift}</span></td>
       <td><strong>${group.qcName}</strong></td>
       <td>${group.totalPipes}</td>
       <td>${group.accepted}</td>
@@ -1156,20 +1165,21 @@ function renderQualitySummary() {
       <td>${group.totalWt.toFixed(1)}</td>
       <td>${group.acceptedWt.toFixed(1)}</td>
       <td>${group.rejectedWt.toFixed(1)}</td>
-      <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated on Weight (Kg.)">${rejPct}%</span></td>
+      <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></td>
     `;
         tbody.appendChild(tr);
         srNo++;
     });
 
     // Grand Total Row
-    const gtRejPct = gtQty > 0 ? ((gtRej / gtQty) * 100).toFixed(2) : '0.00';
+    const totalGmWtQC = gtAccWt + gtRejWt;
+    const gtRejPct = totalGmWtQC > 0 ? ((gtRejWt / totalGmWtQC) * 100).toFixed(2) : '0.00';
     const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
 
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
-        <td colspan="2"><strong>Grand Total</strong></td>
+        <td colspan="3"><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${gtRej}</strong></td>
@@ -1267,8 +1277,8 @@ function renderAcceptRejectChart() {
     const acceptedVals = groupOrder.map(k => groups[k].accepted);
     const rejectedVals = groupOrder.map(k => groups[k].rejected);
     const rejPctVals = groupOrder.map(k => {
-        const total = groups[k].accepted + groups[k].rejected;
-        return total > 0 ? parseFloat(((groups[k].rejected / total) * 100).toFixed(1)) : 0;
+        const total = groups[k].acceptedWt + groups[k].rejectedWt;
+        return total > 0 ? parseFloat(((groups[k].rejectedWt / total) * 100).toFixed(1)) : 0;
     });
 
     const ctx = document.getElementById('chartAccRej');
@@ -1607,8 +1617,8 @@ function renderSupervisorChart() {
     const acceptedVals = labels.map(s => supGroups[s].accepted);
     const rejectedVals = labels.map(s => supGroups[s].rejected);
     const rejPctVals = labels.map(s => {
-        const total = supGroups[s].accepted + supGroups[s].rejected;
-        return total > 0 ? parseFloat(((supGroups[s].rejected / total) * 100).toFixed(1)) : 0;
+        const total = supGroups[s].acceptedWt + supGroups[s].rejectedWt;
+        return total > 0 ? parseFloat(((supGroups[s].rejectedWt / total) * 100).toFixed(1)) : 0;
     });
 
     const ctx = document.getElementById('chartSupervisor');
@@ -1812,7 +1822,7 @@ function renderDailyReport() {
     } else {
         renderDailyQuality(dateInfo, contentEl);
     }
-    renderDaily24HrSummary(dateInfo, summaryEl);
+    renderDaily24HrSummary(dateInfo, summaryEl, dailySubTab);
 }
 
 function getShiftLabel(raw) {
@@ -1935,7 +1945,8 @@ function renderDailyProduction(dateInfo, container) {
                 </tr></thead><tbody>`;
             
             pipeRows.forEach((p, idx) => {
-                const rejPct = p.qty > 0 ? (p.rej / p.qty * 100).toFixed(1) : '0';
+                const totalWtValue = p.accWt + p.rejWt;
+                const rejPct = totalWtValue > 0 ? (p.rejWt / totalWtValue * 100).toFixed(1) : '0';
                 const showRemark = p.hasPending && (p.acc + p.rej === 0);
                 
                 html += `<tr>
@@ -1955,7 +1966,7 @@ function renderDailyProduction(dateInfo, container) {
                         <td>${showRemark ? '—' : (p.rCracks || '')}</td>
                         <td>${showRemark ? '—' : (p.ovality || '')}</td>
                         <td>${showRemark ? '—' : (p.others || '')}</td>
-                        <td><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${showRemark ? '—' : rejPct + '%'}</span></td>
+                        <td><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${showRemark ? '—' : rejPct + '%'}</span></td>
                     ` : ''}
                 </tr>`;
             });
@@ -1964,7 +1975,8 @@ function renderDailyProduction(dateInfo, container) {
             const totalRej = pipeRows.reduce((s, p) => s + p.rej, 0);
             const totalAccWt = pipeRows.reduce((s, p) => s + p.accWt, 0);
             const totalRejWt = pipeRows.reduce((s, p) => s + p.rejWt, 0);
-            const totalRejPct = totalQty > 0 ? (totalRej / totalQty * 100).toFixed(1) : '0';
+            const totalWtSum = totalAccWt + totalRejWt;
+            const totalRejPct = totalWtSum > 0 ? (totalRejWt / totalWtSum * 100).toFixed(1) : '0';
 
             html += `<tr class="subtotal-row">
                 <td colspan="3" style="text-align:right;"><strong>Shift Total</strong></td>
@@ -1977,7 +1989,7 @@ function renderDailyProduction(dateInfo, container) {
                     <td><strong>${totalAccWt.toFixed(1)}</strong></td>
                     <td><strong>${totalRejWt.toFixed(1)}</strong></td>
                     <td colspan="5"></td>
-                    <td><strong>${totalRejPct}%</strong></td>
+                    <td><strong><span data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${totalRejPct}%</span></strong></td>
                 ` : ''}
             </tr></tbody></table></div>`;
         } else {
@@ -2062,7 +2074,10 @@ function renderDailyQuality(dateInfo, container) {
         const totalRCracks = rows.reduce((s, r) => s + r.rCracks, 0);
         const totalOvality = rows.reduce((s, r) => s + r.ovality, 0);
         const totalOthers = rows.reduce((s, r) => s + r.others, 0);
-        const rejPct = totalQty > 0 ? ((totalRej / totalQty) * 100).toFixed(1) : '0.0';
+        const stAccWt = rows.reduce((s, r) => s + r.acceptedWt, 0);
+        const stRejWt = rows.reduce((s, r) => s + r.rejectedWt, 0);
+        const stTotalWt = stAccWt + stRejWt;
+        const rejPct = stTotalWt > 0 ? ((stRejWt / stTotalWt) * 100).toFixed(1) : '0.0';
 
         html += `<div class="shift-card">
             <div class="shift-card-header">
@@ -2075,7 +2090,7 @@ function renderDailyQuality(dateInfo, container) {
                 </div>
                 <div class="shift-card-meta">
                     <div>Checked: <strong>${totalQty}</strong></div>
-                    <div>Rejected: <strong style="color:var(--accent-red);">${totalRej} (${rejPct}%)</strong></div>
+                    <div data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">Rejected: <strong style="color:var(--accent-red);">${totalRej} (${rejPct}%)</strong></div>
                 </div>
             </div>
             <div class="shift-card-body">
@@ -2108,7 +2123,8 @@ function renderDailyQuality(dateInfo, container) {
         const pipeRows = Object.values(pipeSizeMap);
 
         pipeRows.forEach((p, idx) => {
-            const rp = p.total > 0 ? ((p.rej / p.total) * 100).toFixed(1) : '0.0';
+            const pTotalWt = p.accWt + p.rejWt;
+            const rp = pTotalWt > 0 ? ((p.rejWt / pTotalWt) * 100).toFixed(1) : '0.0';
             const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
             const ldStr = [...p.loadDates].join(', ');
             html += `<tr>
@@ -2117,7 +2133,7 @@ function renderDailyQuality(dateInfo, container) {
                 <td>${p.totalWt.toFixed(1)}</td><td>${p.accWt.toFixed(1)}</td><td>${p.rejWt.toFixed(1)}</td>
                 <td>${p.cavity || ''}</td><td>${p.cracks || ''}</td><td>${p.rCracks || ''}</td>
                 <td>${p.ovality || ''}</td><td>${p.others || ''}</td>
-                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+                <td><span class="badge-rate ${rc}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rp}%</span></td>
             </tr>`;
         });
 
@@ -2131,48 +2147,72 @@ function renderDailyQuality(dateInfo, container) {
             <td><strong>${totalCavity || ''}</strong></td><td><strong>${totalCracks || ''}</strong></td>
             <td><strong>${totalRCracks || ''}</strong></td><td><strong>${totalOvality || ''}</strong></td>
             <td><strong>${totalOthers || ''}</strong></td>
-            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good'}">${rejPct}%</span></strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good'}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></strong></td>
         </tr></tbody></table></div></div></div>`;
     });
 
     container.innerHTML = html;
 }
 
-function renderDaily24HrSummary(dateInfo, container) {
+function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
     const dayData = allData.filter(r => r.date === dateInfo.display);
     if (dayData.length === 0) { container.innerHTML = ''; return; }
 
+    const isQual = mode === 'quality';
+
+    // Base Metrics
     const totalQty = dayData.reduce((s, r) => s + r.totalPipes, 0);
     const totalWt = dayData.reduce((s, r) => s + r.totalWt, 0);
     const totalAcc = dayData.reduce((s, r) => s + r.accepted, 0);
     const totalRej = dayData.reduce((s, r) => s + r.rejected, 0);
     const totalAccWt = dayData.reduce((s, r) => s + r.acceptedWt, 0);
     const totalRejWt = dayData.reduce((s, r) => s + r.rejectedWt, 0);
-    const rejPct = totalQty > 0 ? ((totalRej / totalQty) * 100).toFixed(1) : '0.0';
-    const shiftsActive = new Set(dayData.map(r => r.shift)).size;
+    const totalWtCalc = totalAccWt + totalRejWt;
+    const rejPct = totalWtCalc > 0 ? ((totalRejWt / totalWtCalc) * 100).toFixed(1) : '0.0';
 
-    // Shift level summary
-    const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateInfo.display);
-    const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch']) || 0), 0);
-    const totalInputKg = dayShiftData.reduce((s, r) => {
-        const bs = parseFloat(r['Input KG_BS'] || 0);
-        const l1 = parseFloat(r['Input KG_L1'] || 0);
-        const l2 = parseFloat(r['Input KG_L2'] || 0);
-        const rr = parseFloat(r['Input KG_RR'] || 0);
-        return s + bs + l1 + l2 + rr;
-    }, 0);
+    if (isQual) {
+        // Quality Specific Calculations
+        const totalChecked = totalAcc + totalRej;
+        const totalCheckedWt = totalAccWt + totalRejWt;
+        const totalDefects = dayData.reduce((s, r) => s + (r.status === 'QC Checked' ? (r.cavity || 0) + (r.cracks || 0) + (r.rCracks || 0) + (r.ovality || 0) + (r.others || 0) : 0), 0);
+        const activeQCs = new Set(dayData.flatMap(r => (r.qcName || '').split(',').map(n => n.trim())).filter(n => n && n !== '—')).size;
 
-    container.innerHTML = `<div class="daily-summary-card">
-        <h4>📊 24-Hour Summary — ${formatDate(dateInfo.display)}</h4>
-        <div class="daily-summary-grid">
-            <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${shiftsActive}</div><div class="ds-unit">of 3</div></div>
-            <div class="daily-summary-item"><div class="ds-label">Total Pipes</div><div class="ds-value">${totalQty.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
-            <div class="daily-summary-item"><div class="ds-label">Total Weight</div><div class="ds-value">${totalWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
-            <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
-            <div class="daily-summary-item"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
-            <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-amber);"><div class="ds-label">Input Furnace</div><div class="ds-value" style="color:var(--accent-amber);">${totalInputKg.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">${totalBatches ? totalBatches + ' batches' : 'Total Kg'}</div></div>
-        </div>
-    </div>`;
+        container.innerHTML = `<div class="daily-summary-card quality-theme">
+            <h4>📋 24-Hour Quality Summary — ${formatDate(dateInfo.display)}</h4>
+            <div class="daily-summary-grid">
+                <div class="daily-summary-item"><div class="ds-label">QC Specialists</div><div class="ds-value">${activeQCs}</div><div class="ds-unit">active</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Total Checked</div><div class="ds-value">${totalChecked.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Weight Checked</div><div class="ds-value">${totalCheckedWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
+                <div class="daily-summary-item" style="border-left: 1px solid var(--border-color);"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
+                <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
+                <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-red);"><div class="ds-label">Total Defects</div><div class="ds-value" style="color:var(--accent-red);">${totalDefects}</div><div class="ds-unit">detected</div></div>
+            </div>
+        </div>`;
+    } else {
+        // Production Specific Calculations
+        const shiftsActive = new Set(dayData.map(r => r.shift)).size;
+        const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateInfo.display);
+        const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch']) || 0), 0);
+        const totalInputKg = dayShiftData.reduce((s, r) => {
+            const bs = parseFloat(r['Input KG_BS'] || 0);
+            const l1 = parseFloat(r['Input KG_L1'] || 0);
+            const l2 = parseFloat(r['Input KG_L2'] || 0);
+            const rr = parseFloat(r['Input KG_RR'] || 0);
+            return s + bs + l1 + l2 + rr;
+        }, 0);
+
+        container.innerHTML = `<div class="daily-summary-card">
+            <h4>📊 24-Hour Production Summary — ${formatDate(dateInfo.display)}</h4>
+            <div class="daily-summary-grid">
+                <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${shiftsActive}</div><div class="ds-unit">of 3</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Total Pipes</div><div class="ds-value">${totalQty.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Total Weight</div><div class="ds-value">${totalWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
+                <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
+                <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-amber);"><div class="ds-label">Input Furnace</div><div class="ds-value" style="color:var(--accent-amber);">${totalInputKg.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">${totalBatches ? totalBatches + ' batches' : 'Total Kg'}</div></div>
+            </div>
+        </div>`;
+    }
 }
 
 function exportMonthlyCSV() {
@@ -2190,6 +2230,7 @@ function exportMonthlyCSV() {
     csv += headers.map(csvSafe).join(',') + '\r\n';
 
     let gmPipes = 0, gmWt = 0, gmAcc = 0, gmRej = 0;
+    let gmAccWtTotal = 0, gmRejWtTotal = 0;
 
     for (let day = 1; day <= daysInMonth; day++) {
         const dd = String(day).padStart(2, '0');
@@ -2198,7 +2239,7 @@ function exportMonthlyCSV() {
         const dayRows = allData.filter(r => r.date === dateStr);
 
         const byShift = { 'I': { pipes: 0, wt: 0 }, 'II': { pipes: 0, wt: 0 }, 'III': { pipes: 0, wt: 0 } };
-        let dayPipes = 0, dayWt = 0, dayAcc = 0, dayRej = 0;
+        let dayPipes = 0, dayWt = 0, dayAcc = 0, dayRej = 0, dayAccWt = 0, dayRejWt = 0;
 
         dayRows.forEach(r => {
             const s = r.shift || 'I';
@@ -2208,26 +2249,33 @@ function exportMonthlyCSV() {
             }
             dayPipes += r.totalPipes;
             dayWt += r.totalWt;
-            dayAcc += r.accepted;
-            dayRej += r.rejected;
+            if (r.status === 'QC Checked') {
+                dayAcc += r.accepted;
+                dayRej += r.rejected;
+                dayAccWt += r.acceptedWt;
+                dayRejWt += r.rejectedWt;
+            }
         });
 
         gmPipes += dayPipes;
         gmWt += dayWt;
         gmAcc += dayAcc;
         gmRej += dayRej;
+        gmAccWtTotal += dayAccWt;
+        gmRejWtTotal += dayRejWt;
 
-        const rejPct = dayPipes > 0 ? ((dayRej / dayPipes) * 100).toFixed(1) + '%' : '';
+        const totalWtQC = dayAccWt + dayRejWt;
+        const rejPct = totalWtQC > 0 ? ((dayRejWt / totalWtQC) * 100).toFixed(1) + '%' : '';
 
-        csv += [dateStr, byShift['I'].pipes || '', (byShift['I'].wt || '').toFixed ? byShift['I'].wt.toFixed(1) : '',
-            byShift['II'].pipes || '', byShift['II'].wt ? byShift['II'].wt.toFixed(1) : '',
-            byShift['III'].pipes || '', byShift['III'].wt ? byShift['III'].wt.toFixed(1) : '',
+        csv += [dateStr, byShift['I'].pipes || '', (byShift['I'].wt || 0).toFixed(1),
+            byShift['II'].pipes || '', (byShift['II'].wt || 0).toFixed(1),
+            byShift['III'].pipes || '', (byShift['III'].wt || 0).toFixed(1),
             dayPipes || '', dayWt ? dayWt.toFixed(1) : '', dayAcc || '', dayRej || '', rejPct
         ].map(csvSafe).join(',') + '\r\n';
     }
 
-    // Grand total row
-    const gmRejPct = gmPipes > 0 ? ((gmRej / gmPipes) * 100).toFixed(1) + '%' : '';
+    const totalGmWtQC = gmAccWtTotal + gmRejWtTotal;
+    const gmRejPct = totalGmWtQC > 0 ? ((gmRejWtTotal / totalGmWtQC) * 100).toFixed(1) + '%' : '';
     csv += ['TOTAL','','','','','','',gmPipes,gmWt.toFixed(1),gmAcc,gmRej,gmRejPct].map(csvSafe).join(',') + '\r\n';
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2353,7 +2401,11 @@ function renderSummaryReport() {
     const totalWt = periodData.reduce((s,r) => s + r.totalWt, 0);
     const totalRej = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejected : 0), 0);
     const totalAcc = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.accepted : 0), 0);
-    const rejPct = totalQty > 0 ? ((totalRej/totalQty)*100).toFixed(1) : '0.0';
+    
+    const totalAccWtChecked = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0);
+    const totalRejWtChecked = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejectedWt : 0), 0);
+    const totalWeightSum = totalAccWtChecked + totalRejWtChecked;
+    const rejPct = totalWeightSum > 0 ? ((totalRejWtChecked / totalWeightSum) * 100).toFixed(1) : '0.0';
 
     kpiEl.innerHTML = `
         <div class="kpi-card blue">
@@ -2369,7 +2421,7 @@ function renderSummaryReport() {
         <div class="kpi-card red">
             <div class="kpi-label">Rejected (Nos)</div>
             <div class="kpi-value">${totalRej.toLocaleString('en-IN')}</div>
-            <div class="kpi-sub">${rejPct}% rejection rate</div>
+            <div class="kpi-sub" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}% rejection rate</div>
         </div>
         <div class="kpi-card amber">
             <div class="kpi-label">Weight ${isQual ? 'Checked' : 'Produced'}</div>
@@ -2391,7 +2443,8 @@ function renderSummaryReport() {
             </tr></thead><tbody>`;
 
     sortedPipes.forEach((p, idx) => {
-        const rp = p.qty > 0 ? ((p.rej / p.qty) * 100).toFixed(1) : '0.0';
+        const pTotalWeight = p.accWt + p.rejWt;
+        const rp = pTotalWeight > 0 ? ((p.rejWt / pTotalWeight) * 100).toFixed(1) : '0.0';
         const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
         
         tableHtml += `<tr>
@@ -2410,7 +2463,7 @@ function renderSummaryReport() {
                 <td>${p.rCracks || '—'}</td>
                 <td>${p.ovality || '—'}</td>
                 <td>${p.others || '—'}</td>
-                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+                <td><span class="badge-rate ${rc}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rp}%</span></td>
             ` : ''}
         </tr>`;
     });
@@ -2441,7 +2494,7 @@ function renderSummaryReport() {
             <td><strong>${gtDefects.rCracks || ''}</strong></td>
             <td><strong>${gtDefects.ovality || ''}</strong></td>
             <td><strong>${gtDefects.others || ''}</strong></td>
-            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></strong></td>
         ` : ''}
     </tr></tbody></table></div>`;
 
@@ -2706,14 +2759,14 @@ function runErrorChecks(data, pipeMaster) {
 
     // 4. High Rejection Rate (> 40%)
     data.forEach(row => {
-        if (row.totalPipes > 0) {
-            const rejRate = (row.rejected / row.totalPipes) * 100;
+        if (row.totalWt > 0) {
+            const rejRate = (row.rejectedWt / row.totalWt) * 100;
             if (rejRate > 40) {
                 flags.push({
                     id: `high_rej_${row.sourceRows[0] || row.date}_${row.supervisor}`,
                     severity: 'warning',
                     type: 'High Rejection',
-                    details: `Rejection rate ${rejRate.toFixed(1)}% exceeds 40% threshold.`,
+                    details: `Weight-based rejection rate ${rejRate.toFixed(1)}% exceeds 40% threshold.`,
                     date: row.date || '—',
                     affected: `${row.supervisor} / ${row.pipeSize}`,
                     rowIds: row.sourceRows || [],
