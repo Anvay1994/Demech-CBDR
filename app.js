@@ -2160,13 +2160,12 @@ function renderDailyQuality(dateInfo, container) {
 }
 
 function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
-    const dayData = allData.filter(r => r.date === dateInfo.display);
+    const isQual = mode === 'quality';
+    const dayData = allData.filter(r => (isQual ? r.qcDate : r.date) === dateInfo.display);
     if (dayData.length === 0) { container.innerHTML = ''; return; }
 
-    const isQual = mode === 'quality';
-
-    // Base Metrics
-    const totalQty = dayData.reduce((s, r) => s + r.totalPipes, 0);
+    // Base Metrics from filtered data
+    const totalPipesInDay = dayData.reduce((s, r) => s + (r.totalPipes || 0), 0);
     const totalWt = dayData.reduce((s, r) => s + r.totalWt, 0);
     const totalAcc = dayData.reduce((s, r) => s + r.accepted, 0);
     const totalRej = dayData.reduce((s, r) => s + r.rejected, 0);
@@ -2210,7 +2209,7 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
             <h4>📊 24-Hour Production Summary — ${formatDate(dateInfo.display)}</h4>
             <div class="daily-summary-grid">
                 <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${shiftsActive}</div><div class="ds-unit">of 3</div></div>
-                <div class="daily-summary-item"><div class="ds-label">Total Pipes</div><div class="ds-value">${totalQty.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Total Pipes</div><div class="ds-value">${totalPipesInDay.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Total Weight</div><div class="ds-value">${totalWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
                 <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
