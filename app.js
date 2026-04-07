@@ -2287,20 +2287,25 @@ function renderSummaryReport() {
         const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
         periodLabel = `${monthNames[parseInt(month)-1]} ${year}`;
     } else {
-        const val = document.getElementById('summaryYear').value; // e.g. "26-27"
+        const val = document.getElementById('summaryYear').value; // e.g. "24-25", "25-26", "26-27"
         periodData = allData.filter(r => {
             if (isQual && r.status !== 'QC Checked') return false;
             const d = r[dateField];
             if (!d) return false;
             const parts = d.split('-');
             if (parts.length < 3) return false;
-            const yearStr = parts[2].substring(2); // "26"
+            
+            const yearFull = parseInt(parts[2]);
             const monthInt = parseInt(parts[1]);
-            // Simple FY logic for 26-27 (Apr 26 to Mar 27)
-            if (val === '26-27') {
-                if (yearStr === '26' && monthInt >= 4) return true;
-                if (yearStr === '27' && monthInt <= 3) return true;
-            }
+            
+            // FY logic: Apr (04) to Mar (03) next year
+            const [startYY, endYY] = val.split('-').map(y => parseInt(y));
+            const startYear = 2000 + startYY;
+            const endYear = 2000 + endYY;
+            
+            if (yearFull === startYear && monthInt >= 4) return true;
+            if (yearFull === endYear && monthInt <= 3) return true;
+            
             return false;
         });
         periodLabel = `FY 20${val}`;
@@ -2326,6 +2331,8 @@ function renderSummaryReport() {
         const p = pipeMap[ps];
         p.qty += r.totalPipes;
         p.wt += r.totalWt;
+        
+        // Only sum status-dependent fields if checked
         if (r.status === 'QC Checked') {
             p.acc += r.accepted;
             p.rej += r.rejected;
@@ -2351,17 +2358,17 @@ function renderSummaryReport() {
     kpiEl.innerHTML = `
         <div class="kpi-card blue">
             <div class="kpi-label">${isQual ? 'Total Checked' : 'Total Produced'}</div>
-            <div class="kpi-value">${totalQty}</div>
+            <div class="kpi-value">${totalQty.toLocaleString('en-IN')}</div>
             <div class="kpi-sub">pipes in ${periodLabel}</div>
         </div>
         <div class="kpi-card green">
             <div class="kpi-label">Accepted (Nos)</div>
-            <div class="kpi-value">${totalAcc}</div>
+            <div class="kpi-value">${totalAcc.toLocaleString('en-IN')}</div>
             <div class="kpi-sub">quality checked</div>
         </div>
         <div class="kpi-card red">
             <div class="kpi-label">Rejected (Nos)</div>
-            <div class="kpi-value">${totalRej}</div>
+            <div class="kpi-value">${totalRej.toLocaleString('en-IN')}</div>
             <div class="kpi-sub">${rejPct}% rejection rate</div>
         </div>
         <div class="kpi-card amber">
@@ -2394,15 +2401,15 @@ function renderSummaryReport() {
             <td>${p.qty}</td>
             <td>${p.wt.toFixed(1)}</td>
             ${displayQC ? `
-                <td>${p.acc}</td>
+                <td class="badge-accepted">${p.acc}</td>
                 <td class="badge-rejected" data-tooltip="${getRejectionTooltip(p)}">${p.rej}</td>
                 <td>${p.accWt.toFixed(1)}</td>
                 <td>${p.rejWt.toFixed(1)}</td>
-                <td>${p.cavity || ''}</td>
-                <td>${p.cracks || ''}</td>
-                <td>${p.rCracks || ''}</td>
-                <td>${p.ovality || ''}</td>
-                <td>${p.others || ''}</td>
+                <td>${p.cavity || '—'}</td>
+                <td>${p.cracks || '—'}</td>
+                <td>${p.rCracks || '—'}</td>
+                <td>${p.ovality || '—'}</td>
+                <td>${p.others || '—'}</td>
                 <td><span class="badge-rate ${rc}">${rp}%</span></td>
             ` : ''}
         </tr>`;
@@ -2416,6 +2423,9 @@ function renderSummaryReport() {
         ovality: sortedPipes.reduce((s,p) => s + p.ovality, 0),
         others: sortedPipes.reduce((s,p) => s + p.others, 0)
     };
+    
+    const totalAccWt = sortedPipes.reduce((s,p) => s + p.accWt, 0);
+    const totalRejWt = sortedPipes.reduce((s,p) => s + p.rejWt, 0);
 
     tableHtml += `<tr class="grand-total-row">
         <td colspan="3" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
@@ -2424,8 +2434,8 @@ function renderSummaryReport() {
         ${displayQC ? `
             <td><strong>${totalAcc}</strong></td>
             <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${totalRej}</strong></td>
-            <td><strong>${periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0).toFixed(1)}</strong></td>
-            <td><strong>${periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejectedWt : 0), 0).toFixed(1)}</strong></td>
+            <td><strong>${totalAccWt.toFixed(1)}</strong></td>
+            <td><strong>${totalRejWt.toFixed(1)}</strong></td>
             <td><strong>${gtDefects.cavity || ''}</strong></td>
             <td><strong>${gtDefects.cracks || ''}</strong></td>
             <td><strong>${gtDefects.rCracks || ''}</strong></td>
@@ -2442,7 +2452,6 @@ async function exportSummaryCSV() {
     const val = summaryPeriod === 'monthly' ? document.getElementById('summaryMonth').value : document.getElementById('summaryYear').value;
     if (!val) return;
     
-    // Simple logic: we'll export what is currently being viewed in the summary table
     const pipeTable = document.querySelector('#summaryContent table');
     if (!pipeTable) return;
 
@@ -2453,11 +2462,17 @@ async function exportSummaryCSV() {
 
     pipeTable.querySelectorAll('tbody tr').forEach(tr => {
         const row = [];
-        tr.querySelectorAll('td').forEach(td => row.push(td.textContent.replace('%', '')));
+        tr.querySelectorAll('td').forEach(td => {
+            // Get text and clean up (remove extra spaces/newlines)
+            let text = td.textContent.trim();
+            // Remove % from rate cells for easier math in Excel
+            if (td.querySelector('.badge-rate')) text = text.replace('%', '');
+            row.push(text);
+        });
         csv += row.map(csvSafe).join(',') + '\r\n';
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `Demech_${summaryPeriod}_Summary_${val}_${summaryView}.csv`;
