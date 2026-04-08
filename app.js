@@ -587,7 +587,8 @@ function applyFilters() {
             if (rowDate > toDate) return false;
         }
         // Shift filter
-        if (shift && shift !== 'all' && row.shift !== shift) return false;
+        const rowShiftToCompare = isQualityTab ? (row.qcShift || row.shift) : row.shift;
+        if (shift && shift !== 'all' && rowShiftToCompare !== shift) return false;
         // Production Supervisor filter
         if (supervisor && supervisor !== 'all' && row.supervisor !== supervisor) return false;
         // Quality Supervisor filter (check if name is in comma-separated list)
