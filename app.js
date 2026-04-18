@@ -15,13 +15,15 @@ const SHEETS = {
     report: 'Input Level Data',
     pipeMaster: 'Pipe Master',
     main: 'Summary Sheet',
-    shiftLevel: 'Shift Level Data'
+    shiftLevel: 'Shift Level Data',
+    dayLevel: 'Day Level Data'
 };
 
 // ============ STATE ============
 let allData = [];
 let pipeMasterData = [];
 let shiftLevelData = [];
+let dayLevelData = [];
 let filteredData = [];
 let currentTab = 'dashboard';
 let dailySubTab = 'production';
@@ -2160,12 +2162,114 @@ function renderDailyQuality(dateInfo, container) {
     container.innerHTML = html;
 }
 
+function renderDailyPipeSummary(dayData, container, mode = 'production') {
+    if (!dayData || dayData.length === 0) return;
+
+    const isQual = mode === 'quality';
+    const pipeSizeMap = {};
+
+    dayData.forEach(r => {
+        const ps = r.pipeSize || '—';
+        if (!pipeSizeMap[ps]) {
+            pipeSizeMap[ps] = {
+                pipeSize: ps,
+                unitWt: r.wtPerPipe,
+                totalQty: 0,
+                totalWt: 0,
+                acc: 0,
+                rej: 0,
+                accWt: 0,
+                rejWt: 0
+            };
+        }
+        const p = pipeSizeMap[ps];
+        p.totalQty += r.totalPipes;
+        p.totalWt += r.totalWt;
+        if (r.status === 'QC Checked') {
+            p.acc += r.accepted;
+            p.rej += r.rejected;
+            p.accWt += r.acceptedWt;
+            p.rejWt += r.rejectedWt;
+        }
+    });
+
+    const pipeRows = Object.values(pipeSizeMap).sort((a, b) => a.pipeSize.localeCompare(b.pipeSize));
+
+    let html = `
+        <div class="daily-summary-pipe-section" style="margin-bottom: 2rem;">
+            <div class="table-title" style="margin-bottom: 0.75rem; color: var(--text-primary); font-family: Outfit; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                ${isQual ? '🔍' : '🏭'} 24-Hour Daily ${isQual ? 'Quality' : 'Production'} Summary (Pipe-wise)
+            </div>
+            <div class="report-table-wrapper" style="background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Sr.</th>
+                            <th>Pipe Size</th>
+                            <th>Unit Wt</th>
+                            <th>Total Qty</th>
+                            <th>Total Wt (Kg)</th>
+                            ${isQual ? '<th>Accepted</th><th>Rejected</th><th>Acc Wt</th><th>Rej Wt</th><th>Rej %</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    pipeRows.forEach((p, idx) => {
+        const totalWtValue = p.accWt + p.rejWt;
+        const rejPct = totalWtValue > 0 ? (p.rejWt / totalWtValue * 100).toFixed(1) : '0.0';
+        const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
+
+        html += `
+            <tr>
+                <td>${idx + 1}</td>
+                <td style="color: var(--text-primary); font-weight: 500;">${p.pipeSize}</td>
+                <td>${p.unitWt}</td>
+                <td>${p.totalQty}</td>
+                <td>${p.totalWt.toFixed(1)}</td>
+                ${isQual ? `
+                    <td class="badge-accepted">${p.acc}</td>
+                    <td class="badge-rejected">${p.rej}</td>
+                    <td>${p.accWt.toFixed(1)}</td>
+                    <td>${p.rejWt.toFixed(1)}</td>
+                    <td><span class="badge-rate ${rateClass}">${rejPct}%</span></td>
+                ` : ''}
+            </tr>
+        `;
+    });
+
+    // Grand totals for this table
+    const grandQty = pipeRows.reduce((s, p) => s + p.totalQty, 0);
+    const grandWt = pipeRows.reduce((s, p) => s + p.totalWt, 0);
+
+    html += `
+                        <tr class="subtotal-row">
+                            <td colspan="3" style="text-align:right;"><strong>Daily Total</strong></td>
+                            <td><strong>${grandQty}</strong></td>
+                            <td><strong>${grandWt.toFixed(1)}</strong></td>
+                            ${isQual ? `
+                                <td colspan="5"></td>
+                            ` : ''}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+
+    container.innerHTML += html;
+}
+
 function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
     const isQual = mode === 'quality';
     const dayData = allData.filter(r => (isQual ? r.qcDate : r.date) === dateInfo.display);
     if (dayData.length === 0) { container.innerHTML = ''; return; }
 
-    // Base Metrics from filtered data
+    container.innerHTML = ''; // Start clean
+    
+    // 1. Render Pipe-wise Table First
+    renderDailyPipeSummary(dayData, container, mode);
+
+    // 2. Base Metrics for KPI Cards
     const totalPipesInDay = dayData.reduce((s, r) => s + (r.totalPipes || 0), 0);
     const totalWt = dayData.reduce((s, r) => s + r.totalWt, 0);
     const totalAcc = dayData.reduce((s, r) => s + r.accepted, 0);
@@ -2206,7 +2310,16 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
             return s + bs + l1 + l2 + rr;
         }, 0);
 
-        container.innerHTML = `<div class="daily-summary-card">
+        // --- Consumption Data from Day Level Data ---
+        const dayLevel = dayLevelData.find(r => String(r['Date'] || '').trim() === dateInfo.display);
+        const electricity = dayLevel ? (dayLevel['Electricity Consumption'] || '—') : '—';
+        const png = dayLevel ? (dayLevel['PNG Consumption'] || '—') : '—';
+        const furnaceOil = dayLevel ? (dayLevel['Furnace Oil'] || '—') : '—';
+        const tyreOil = dayLevel ? (dayLevel['Tyre Oil'] || '—') : '—';
+        const igniteOil = dayLevel ? (dayLevel['Ignite Oil'] || '—') : '—';
+        const labourQty = dayLevel ? (dayLevel['Labour Qty'] || '—') : '—';
+
+        container.innerHTML += `<div class="daily-summary-card">
             <h4>📊 24-Hour Production Summary — ${formatDate(dateInfo.display)}</h4>
             <div class="daily-summary-grid">
                 <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${shiftsActive}</div><div class="ds-unit">of 3</div></div>
@@ -2215,6 +2328,16 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
                 <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
                 <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
                 <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-amber);"><div class="ds-label">Input Furnace</div><div class="ds-value" style="color:var(--accent-amber);">${totalInputKg.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">${totalBatches ? totalBatches + ' batches' : 'Total Kg'}</div></div>
+            </div>
+
+            <!-- Consumption & Labour Summary -->
+            <div class="daily-summary-grid consumption-grid-detailed" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-glass);">
+                <div class="daily-summary-item"><div class="ds-label">Electricity</div><div class="ds-value" style="color: var(--accent-blue);">${electricity}</div><div class="ds-unit">Consumption</div></div>
+                <div class="daily-summary-item"><div class="ds-label">PNG</div><div class="ds-value" style="color: var(--accent-blue);">${png}</div><div class="ds-unit">Consumption</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Furnace Oil</div><div class="ds-value" style="color: var(--accent-purple);">${furnaceOil}</div><div class="ds-unit">Ltrs</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Tyre Oil</div><div class="ds-value" style="color: var(--accent-purple);">${tyreOil}</div><div class="ds-unit">Ltrs</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Ignite Oil</div><div class="ds-value" style="color: var(--accent-purple);">${igniteOil}</div><div class="ds-unit">Ltrs</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Labour Qty</div><div class="ds-value" style="color: var(--accent-green);">${labourQty}</div><div class="ds-unit">Workers</div></div>
             </div>
         </div>`;
     }
@@ -3003,15 +3126,17 @@ async function initApp() {
 
     try {
         // Fetch data from Google Sheets (parallel)
-        const [rawData, rawPipeMaster, rawShiftLevel] = await Promise.all([
+        const [rawData, rawPipeMaster, rawShiftLevel, rawDayLevel] = await Promise.all([
             fetchSheetData(SHEETS.report),
             fetchSheetData(SHEETS.pipeMaster).catch(() => []),
-            fetchSheetData(SHEETS.shiftLevel).catch(() => [])
+            fetchSheetData(SHEETS.shiftLevel).catch(() => []),
+            fetchSheetData(SHEETS.dayLevel).catch(() => [])
         ]);
 
         allData = transformReportData(rawData);
         pipeMasterData = rawPipeMaster || [];
         shiftLevelData = rawShiftLevel || [];
+        dayLevelData = rawDayLevel || [];
 
         // Set default date filter: last 7 days for dashboard
         setDefaultDateRange();

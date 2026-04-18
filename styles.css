@@ -1648,6 +1648,26 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   gap: 1rem;
 }
 
+.consumption-grid-detailed {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+}
+
+.daily-summary-pipe-section .report-table-wrapper {
+  margin-top: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.daily-summary-pipe-section .report-table th {
+  background: rgba(67, 97, 238, 0.05);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.daily-summary-pipe-section .report-table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+}
+
 .daily-summary-item {
   text-align: center;
 }
