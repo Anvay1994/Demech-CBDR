@@ -2286,7 +2286,7 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
         const totalDefects = dayData.reduce((s, r) => s + (r.status === 'QC Checked' ? (r.cavity || 0) + (r.cracks || 0) + (r.rCracks || 0) + (r.ovality || 0) + (r.others || 0) : 0), 0);
         const activeQCs = new Set(dayData.flatMap(r => (r.qcName || '').split(',').map(n => n.trim())).filter(n => n && n !== '—')).size;
 
-        container.innerHTML = `<div class="daily-summary-card quality-theme">
+        container.innerHTML += `<div class="daily-summary-card quality-theme">
             <h4>📋 24-Hour Quality Summary — ${formatDate(dateInfo.display)}</h4>
             <div class="daily-summary-grid">
                 <div class="daily-summary-item"><div class="ds-label">QC Specialists</div><div class="ds-value">${activeQCs}</div><div class="ds-unit">active</div></div>
