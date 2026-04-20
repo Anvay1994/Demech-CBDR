@@ -1830,7 +1830,9 @@ function renderDailyReport() {
     } else {
         renderDailyQuality(dateInfo, contentEl);
     }
-    renderDaily24HrSummary(dateInfo, summaryEl, dailySubTab);
+    
+    const showQC = document.getElementById('toggleDailyProdQc')?.checked || false;
+    renderDaily24HrSummary(dateInfo, summaryEl, dailySubTab, showQC);
 }
 
 function getShiftLabel(raw) {
@@ -1974,7 +1976,7 @@ function renderDailyProduction(dateInfo, container) {
                         <td>${showRemark ? '—' : (p.rCracks || '')}</td>
                         <td>${showRemark ? '—' : (p.ovality || '')}</td>
                         <td>${showRemark ? '—' : (p.others || '')}</td>
-                        <td><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${showRemark ? '—' : rejPct + '%'}</span></td>
+                        <td><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good'}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${showRemark ? '—' : rejPct + '%'}</span></td>
                     ` : ''}
                 </tr>`;
             });
@@ -2162,10 +2164,11 @@ function renderDailyQuality(dateInfo, container) {
     container.innerHTML = html;
 }
 
-function renderDailyPipeSummary(dayData, container, mode = 'production') {
+function renderDailyPipeSummary(dayData, container, mode = 'production', showQC = false) {
     if (!dayData || dayData.length === 0) return;
 
     const isQual = mode === 'quality';
+    const showQCColumns = isQual || showQC;
     const pipeSizeMap = {};
 
     dayData.forEach(r => {
@@ -2206,10 +2209,10 @@ function renderDailyPipeSummary(dayData, container, mode = 'production') {
                         <tr>
                             <th>Sr.</th>
                             <th>Pipe Size</th>
-                            <th>Unit Wt</th>
-                            <th>Total Qty</th>
-                            <th>Total Wt (Kg)</th>
-                            ${isQual ? '<th>Accepted</th><th>Rejected</th><th>Acc Wt</th><th>Rej Wt</th><th>Rej %</th>' : ''}
+                            <th>Unit Wt (Kg)</th>
+                            <th>Qty (Nos)</th>
+                            <th>Prod Wt (Kg)</th>
+                            ${showQCColumns ? '<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Rej %</th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -2227,12 +2230,12 @@ function renderDailyPipeSummary(dayData, container, mode = 'production') {
                 <td>${p.unitWt}</td>
                 <td>${p.totalQty}</td>
                 <td>${p.totalWt.toFixed(1)}</td>
-                ${isQual ? `
+                ${showQCColumns ? `
                     <td class="badge-accepted">${p.acc}</td>
                     <td class="badge-rejected">${p.rej}</td>
                     <td>${p.accWt.toFixed(1)}</td>
                     <td>${p.rejWt.toFixed(1)}</td>
-                    <td><span class="badge-rate ${rateClass}">${rejPct}%</span></td>
+                    <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></td>
                 ` : ''}
             </tr>
         `;
@@ -2241,14 +2244,25 @@ function renderDailyPipeSummary(dayData, container, mode = 'production') {
     // Grand totals for this table
     const grandQty = pipeRows.reduce((s, p) => s + p.totalQty, 0);
     const grandWt = pipeRows.reduce((s, p) => s + p.totalWt, 0);
+    const grandAcc = pipeRows.reduce((s, p) => s + p.acc, 0);
+    const grandRej = pipeRows.reduce((s, p) => s + p.rej, 0);
+    const grandAccWt = pipeRows.reduce((s, p) => s + p.accWt, 0);
+    const grandRejWt = pipeRows.reduce((s, p) => s + p.rejWt, 0);
+    const grandTotalWtQC = grandAccWt + grandRejWt;
+    const grandRejPct = grandTotalWtQC > 0 ? ((grandRejWt / grandTotalWtQC) * 100).toFixed(1) : '0.0';
+    const grandRateClass = parseFloat(grandRejPct) > 30 ? 'danger' : parseFloat(grandRejPct) > 15 ? 'warning' : 'good';
 
     html += `
                         <tr class="subtotal-row">
                             <td colspan="3" style="text-align:right;"><strong>Daily Total</strong></td>
                             <td><strong>${grandQty}</strong></td>
                             <td><strong>${grandWt.toFixed(1)}</strong></td>
-                            ${isQual ? `
-                                <td colspan="5"></td>
+                            ${showQCColumns ? `
+                                <td><strong>${grandAcc}</strong></td>
+                                <td><strong>${grandRej}</strong></td>
+                                <td><strong>${grandAccWt.toFixed(1)}</strong></td>
+                                <td><strong>${grandRejWt.toFixed(1)}</strong></td>
+                                <td><strong><span class="badge-rate ${grandRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${grandRejPct}%</span></strong></td>
                             ` : ''}
                         </tr>
                     </tbody>
@@ -2259,7 +2273,7 @@ function renderDailyPipeSummary(dayData, container, mode = 'production') {
     container.innerHTML += html;
 }
 
-function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
+function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC = false) {
     const isQual = mode === 'quality';
     const dayData = allData.filter(r => (isQual ? r.qcDate : r.date) === dateInfo.display);
     if (dayData.length === 0) { container.innerHTML = ''; return; }
@@ -2267,7 +2281,7 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production') {
     container.innerHTML = ''; // Start clean
     
     // 1. Render Pipe-wise Table First
-    renderDailyPipeSummary(dayData, container, mode);
+    renderDailyPipeSummary(dayData, container, mode, showQC);
 
     // 2. Base Metrics for KPI Cards
     const totalPipesInDay = dayData.reduce((s, r) => s + (r.totalPipes || 0), 0);
@@ -2418,9 +2432,17 @@ function exportMonthlyCSV() {
 function setSummaryPeriod(period) {
     summaryPeriod = period;
     document.querySelectorAll('#section-summary .daily-sub-tabs:first-child .daily-sub-tab').forEach(b => b.classList.remove('active'));
-    document.getElementById(period === 'monthly' ? 'btnSummaryMonthly' : 'btnSummaryYearly')?.classList.add('active');
+    
+    let activeBtnId = 'btnSummaryMonthly';
+    if (period === 'yearly') activeBtnId = 'btnSummaryYearly';
+    if (period === 'range') activeBtnId = 'btnSummaryRange';
+    
+    document.getElementById(activeBtnId)?.classList.add('active');
+    
     document.getElementById('summaryMonthPicker').style.display = period === 'monthly' ? 'block' : 'none';
     document.getElementById('summaryYearPicker').style.display = period === 'yearly' ? 'block' : 'none';
+    document.getElementById('summaryRangePicker').style.display = period === 'range' ? 'flex' : 'none';
+    
     renderSummaryReport();
 }
 
@@ -2462,6 +2484,23 @@ function renderSummaryReport() {
         });
         const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
         periodLabel = `${monthNames[parseInt(month)-1]} ${year}`;
+    } else if (summaryPeriod === 'range') {
+        const startVal = document.getElementById('summaryStartDate').value;
+        const endVal = document.getElementById('summaryEndDate').value;
+        if (!startVal || !endVal) { container.innerHTML = '<div class="empty-state">Select a valid range</div>'; return; }
+        
+        const startDate = new Date(startVal); startDate.setHours(0,0,0,0);
+        const endDate = new Date(endVal); endDate.setHours(23,59,59,999);
+        
+        periodData = allData.filter(r => {
+            if (isQual && r.status !== 'QC Checked') return false;
+            const dStr = r[dateField];
+            if (!dStr) return false;
+            const rDate = parseDate(dStr);
+            return rDate >= startDate && rDate <= endDate;
+        });
+        
+        periodLabel = `Range: ${formatDate(startVal)} to ${formatDate(endVal)}`;
     } else {
         const val = document.getElementById('summaryYear').value; // e.g. "24-25", "25-26", "26-27"
         periodData = allData.filter(r => {
@@ -3156,6 +3195,22 @@ async function initApp() {
         if (summaryMonthInput && !summaryMonthInput.value) {
             const now = new Date();
             summaryMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        // Set default dates for custom range (Current Month)
+        const summaryStartInput = document.getElementById('summaryStartDate');
+        const summaryEndInput = document.getElementById('summaryEndDate');
+        if (summaryStartInput && summaryEndInput && !summaryStartInput.value) {
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            const fmt = (d) => {
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd}`;
+            };
+            summaryStartInput.value = fmt(firstDay);
+            summaryEndInput.value = fmt(now);
         }
 
         const flagCount = dataQualityFlags.length;

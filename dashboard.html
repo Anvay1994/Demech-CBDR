@@ -436,6 +436,7 @@
                         <div class="daily-sub-tabs" style="margin-right: 1.5rem;">
                             <button class="daily-sub-tab active" id="btnSummaryMonthly" onclick="setSummaryPeriod('monthly')">Monthly</button>
                             <button class="daily-sub-tab" id="btnSummaryYearly" onclick="setSummaryPeriod('yearly')">Yearly (FY)</button>
+                            <button class="daily-sub-tab" id="btnSummaryRange" onclick="setSummaryPeriod('range')">Free Range</button>
                         </div>
                     </div>
 
@@ -451,6 +452,18 @@
                             <option value="26-27" selected>FY 2026-27</option>
                         </select>
                     </div>
+
+                    <div class="daily-date-picker" id="summaryRangePicker" style="display:none; gap: 0.75rem;">
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px;">From</label>
+                            <input type="date" id="summaryStartDate" class="date-input" style="width: 130px;" onchange="renderSummaryReport()">
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px;">To</label>
+                            <input type="date" id="summaryEndDate" class="date-input" style="width: 130px;" onchange="renderSummaryReport()">
+                        </div>
+                    </div>
+
 
                     <div class="daily-sub-tabs" style="margin-left: 1rem;">
                         <button class="daily-sub-tab active" id="btnSummaryProd" onclick="switchSummaryView('production')">🏭 Production</button>
