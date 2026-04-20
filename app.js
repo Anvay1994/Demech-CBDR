@@ -2702,7 +2702,41 @@ function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
             ` : ''}
         </tr>`;
     });
-    html += `</tbody></table></div>`;
+
+    // Grand Totals Row
+    const totalQty = sortedPipes.reduce((s,p) => s + p.qty, 0);
+    const totalWt = sortedPipes.reduce((s,p) => s + p.wt, 0);
+    const totalAcc = sortedPipes.reduce((s,p) => s + p.acc, 0);
+    const totalRej = sortedPipes.reduce((s,p) => s + p.rej, 0);
+    const totalAccWt = sortedPipes.reduce((s,p) => s + p.accWt, 0);
+    const totalRejWt = sortedPipes.reduce((s,p) => s + p.rejWt, 0);
+    const gtDefects = {
+        cavity: sortedPipes.reduce((s,p) => s + (p.cavity || 0), 0),
+        cracks: sortedPipes.reduce((s,p) => s + (p.cracks || 0), 0),
+        rCracks: sortedPipes.reduce((s,p) => s + (p.rCracks || 0), 0),
+        ovality: sortedPipes.reduce((s,p) => s + (p.ovality || 0), 0),
+        others: sortedPipes.reduce((s,p) => s + (p.others || 0), 0)
+    };
+    const totalWeightSum = totalAccWt + totalRejWt;
+    const rejPct = totalWeightSum > 0 ? ((totalRejWt / totalWeightSum) * 100).toFixed(1) : '0.0';
+
+    html += `<tr class="grand-total-row">
+        <td colspan="3" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
+        <td><strong>${totalQty.toLocaleString('en-IN')}</strong></td>
+        <td><strong>${totalWt.toFixed(1)}</strong></td>
+        ${displayQC ? `
+            <td><strong>${totalAcc.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${totalRej.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${totalAccWt.toFixed(1)}</strong></td>
+            <td><strong>${totalRejWt.toFixed(1)}</strong></td>
+            <td><strong>${gtDefects.cavity || ''}</strong></td>
+            <td><strong>${gtDefects.cracks || ''}</strong></td>
+            <td><strong>${gtDefects.rCracks || ''}</strong></td>
+            <td><strong>${gtDefects.ovality || ''}</strong></td>
+            <td><strong>${gtDefects.others || ''}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+        ` : ''}
+    </tr></tbody></table></div>`;
     container.innerHTML = html;
 }
 
@@ -2740,6 +2774,30 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
                 <td style="color:var(--accent-red);">${totalDefects || '—'}</td>
             </tr>`;
         });
+
+        // Grand Totals for Quality
+        const gt = {
+            qty: sortedDays.reduce((s,d) => s + d.qty, 0),
+            wt: sortedDays.reduce((s,d) => s + d.wt, 0),
+            acc: sortedDays.reduce((s,d) => s + d.acc, 0),
+            rej: sortedDays.reduce((s,d) => s + d.rej, 0),
+            accWt: sortedDays.reduce((s,d) => s + d.accWt, 0),
+            rejWt: sortedDays.reduce((s,d) => s + d.rejWt, 0),
+            defects: sortedDays.reduce((s,d) => s + (d.cavity||0)+(d.cracks||0)+(d.rCracks||0)+(d.ovality||0)+(d.others||0), 0)
+        };
+        const rejPct = (gt.accWt + gt.rejWt) > 0 ? (((gt.rejWt) / (gt.accWt + gt.rejWt)) * 100).toFixed(1) : '0.0';
+
+        html += `<tr class="grand-total-row">
+            <td colspan="2" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
+            <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.wt.toFixed(1)}</strong></td>
+            <td><strong>${gt.acc.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.accWt.toFixed(1)}</strong></td>
+            <td><strong>${gt.rej.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.rejWt.toFixed(1)}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+            <td><strong>${gt.defects || ''}</strong></td>
+        </tr>`;
     } else {
         // PRODUCTION DAY LEVEL (Image 2 reference)
         html += `<table class="report-table" style="min-width: 1600px;">
@@ -2786,6 +2844,54 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
                 <td class="col-bl">${c['Labour Qty'] || '—'}</td>
             </tr>`;
         });
+
+        // Grand Totals for Production
+        const gt = {
+            qty: sortedDays.reduce((s,d) => s + d.qty, 0),
+            wt: sortedDays.reduce((s,d) => s + d.wt, 0),
+            acc: sortedDays.reduce((s,d) => s + d.acc, 0),
+            rej: sortedDays.reduce((s,d) => s + d.rej, 0),
+            accWt: sortedDays.reduce((s,d) => s + d.accWt, 0),
+            rejWt: sortedDays.reduce((s,d) => s + d.rejWt, 0),
+            input: 0, batches: 0,
+            elec: 0, png: 0, fOil: 0, tOil: 0, iOil: 0, labour: 0
+        };
+        
+        sortedDays.forEach(day => {
+            const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === day.date);
+            gt.batches += dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
+            gt.input += dayShiftData.reduce((s, r) => {
+                const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
+                return s + bs + l1 + l2 + rr;
+            }, 0);
+            const c = dayLevelData.find(r => String(r['Date'] || '').trim() === day.date) || {};
+            gt.elec += parseFloat(c['Electricity Consumption'] || 0);
+            gt.png += parseFloat(c['PNG Consumption'] || 0);
+            gt.fOil += parseFloat(c['Furnace Oil'] || 0);
+            gt.tOil += parseFloat(c['Tyre Oil'] || 0);
+            gt.iOil += parseFloat(c['Ignite Oil'] || 0);
+            gt.labour += parseFloat(c['Labour Qty'] || 0);
+        });
+
+        const rejPct = (gt.accWt + gt.rejWt) > 0 ? (((gt.rejWt) / (gt.accWt + gt.rejWt)) * 100).toFixed(1) : '0.0';
+
+        html += `<tr class="grand-total-row">
+            <td colspan="2" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
+            <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.wt.toFixed(0)}</strong></td>
+            <td><strong>${gt.acc}</strong></td>
+            <td><strong>${gt.accWt.toFixed(0)}</strong></td>
+            <td><strong>${gt.rej}</strong></td>
+            <td><strong>${gt.rejWt.toFixed(0)}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+            <td class="col-bl"><strong>${gt.input.toFixed(0)} <small>(${gt.batches})</small></strong></td>
+            <td class="col-bl"><strong>${gt.elec.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.png.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.fOil.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.tOil.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.iOil.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.labour.toFixed(0)}</strong></td>
+        </tr>`;
     }
     html += `</tbody></table></div>`;
     container.innerHTML = html;
