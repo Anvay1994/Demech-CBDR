@@ -2534,7 +2534,11 @@ function renderSummaryReport() {
 
     // Aggregate by Pipe Size
     const pipeMap = {};
+    // Aggregate by Day Level
+    const dayMap = {};
+
     periodData.forEach(r => {
+        // 1. Pipe-wise Aggregation
         const ps = r.pipeSize || '—';
         if (!pipeMap[ps]) {
             pipeMap[ps] = { 
@@ -2547,8 +2551,22 @@ function renderSummaryReport() {
         p.qty += r.totalPipes;
         p.wt += r.totalWt;
         
-        // Only sum status-dependent fields if checked
+        // 2. Day-level Aggregation
+        const d = r[dateField];
+        if (!dayMap[d]) {
+            dayMap[d] = {
+                date: d, qty: 0, wt: 0,
+                acc: 0, rej: 0, accWt: 0, rejWt: 0,
+                cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0,
+                specialists: new Set()
+            };
+        }
+        const day = dayMap[d];
+        day.qty += r.totalPipes;
+        day.wt += r.totalWt;
+
         if (r.status === 'QC Checked') {
+            // Apply to Pipe Map
             p.acc += r.accepted;
             p.rej += r.rejected;
             p.accWt += r.acceptedWt;
@@ -2558,17 +2576,31 @@ function renderSummaryReport() {
             p.rCracks += (r.rCracks || 0);
             p.ovality += (r.ovality || 0);
             p.others += (r.others || 0);
+
+            // Apply to Day Map
+            day.acc += r.accepted;
+            day.rej += r.rejected;
+            day.accWt += r.acceptedWt;
+            day.rejWt += r.rejectedWt;
+            day.cavity += (r.cavity || 0);
+            day.cracks += (r.cracks || 0);
+            day.rCracks += (r.rCracks || 0);
+            day.ovality += (r.ovality || 0);
+            day.others += (r.others || 0);
+            if (r.qcName) {
+                r.qcName.split(',').forEach(n => {
+                    const cleanName = n.trim();
+                    if (cleanName && cleanName !== '—') day.specialists.add(cleanName);
+                });
+            }
         }
     });
 
-    const sortedPipes = Object.values(pipeMap).sort((a,b) => a.pipeSize.localeCompare(b.pipeSize));
-    
     // Render KPIs
     const totalQty = periodData.reduce((s,r) => s + r.totalPipes, 0);
     const totalWt = periodData.reduce((s,r) => s + r.totalWt, 0);
     const totalRej = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejected : 0), 0);
     const totalAcc = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.accepted : 0), 0);
-    
     const totalAccWtChecked = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.acceptedWt : 0), 0);
     const totalRejWtChecked = periodData.reduce((s,r) => s + (r.status === 'QC Checked' ? r.rejectedWt : 0), 0);
     const totalWeightSum = totalAccWtChecked + totalRejWtChecked;
@@ -2597,12 +2629,22 @@ function renderSummaryReport() {
         </div>
     `;
 
-    // Render Table
+    // Render Both Tables
     const showQC = document.getElementById('toggleSummaryQc')?.checked;
-    const isQualView = summaryView === 'quality';
-    const displayQC = isQualView || (summaryView === 'production' && showQC);
+    
+    // 1. Table A: Pipe-wise
+    renderPipeWiseSummaryTable(pipeMap, document.getElementById('summaryPipeLevel'), summaryView, showQC);
+    
+    // 2. Table B: Day Level
+    renderDayLevelSummaryTable(dayMap, document.getElementById('summaryDayLevel'), summaryView);
+}
 
-    let tableHtml = `<div class="report-table-wrapper" style="overflow-x: auto;">
+function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
+    const isQualView = view === 'quality';
+    const displayQC = isQualView || (view === 'production' && showQC);
+    const sortedPipes = Object.values(pipeMap).sort((a,b) => a.pipeSize.localeCompare(b.pipeSize));
+
+    let html = `<div class="report-table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">
         <table class="report-table" style="min-width: ${displayQC ? '1400px' : '100%'};">
             <thead><tr>
                 <th>Sr.</th><th>Pipe Size</th><th>Unit Wt</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>
@@ -2610,11 +2652,11 @@ function renderSummaryReport() {
             </tr></thead><tbody>`;
 
     sortedPipes.forEach((p, idx) => {
-        const pTotalWeight = p.accWt + p.rejWt;
-        const rp = pTotalWeight > 0 ? ((p.rejWt / pTotalWeight) * 100).toFixed(1) : '0.0';
+        const pTotalWt = p.accWt + p.rejWt;
+        const rp = pTotalWt > 0 ? ((p.rejWt / pTotalWt) * 100).toFixed(1) : '0.0';
         const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
         
-        tableHtml += `<tr>
+        html += `<tr>
             <td>${idx + 1}</td>
             <td><strong>${p.pipeSize}</strong></td>
             <td>${p.unitWt}</td>
@@ -2630,42 +2672,96 @@ function renderSummaryReport() {
                 <td>${p.rCracks || '—'}</td>
                 <td>${p.ovality || '—'}</td>
                 <td>${p.others || '—'}</td>
-                <td><span class="badge-rate ${rc}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rp}%</span></td>
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
             ` : ''}
         </tr>`;
     });
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+}
 
-    // Grand Totals Row
-    const gtDefects = {
-        cavity: sortedPipes.reduce((s,p) => s + p.cavity, 0),
-        cracks: sortedPipes.reduce((s,p) => s + p.cracks, 0),
-        rCracks: sortedPipes.reduce((s,p) => s + p.rCracks, 0),
-        ovality: sortedPipes.reduce((s,p) => s + p.ovality, 0),
-        others: sortedPipes.reduce((s,p) => s + p.others, 0)
-    };
+function renderDayLevelSummaryTable(dayMap, container, view) {
+    const isQual = view === 'quality';
+    const sortedDays = Object.values(dayMap).sort((a,b) => parseDate(a.date) - parseDate(b.date));
+
+    let html = `<div class="report-table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">`;
     
-    const totalAccWt = sortedPipes.reduce((s,p) => s + p.accWt, 0);
-    const totalRejWt = sortedPipes.reduce((s,p) => s + p.rejWt, 0);
+    if (isQual) {
+        // QUALITY DAY LEVEL (Image 1 reference)
+        html += `<table class="report-table" style="min-width: 1200px;">
+            <thead><tr>
+                <th>Date</th><th>QC Specialists</th><th>Checked (Nos)</th><th>Checked Wt (Kg)</th>
+                <th>Acc Nos</th><th>Acc Wt</th><th>Rej Nos</th><th>Rej Wt</th><th>Rej %</th><th>Total Defects</th>
+            </tr></thead><tbody>`;
 
-    tableHtml += `<tr class="grand-total-row">
-        <td colspan="3" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
-        <td><strong>${totalQty}</strong></td>
-        <td><strong>${totalWt.toFixed(1)}</strong></td>
-        ${displayQC ? `
-            <td><strong>${totalAcc}</strong></td>
-            <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${totalRej}</strong></td>
-            <td><strong>${totalAccWt.toFixed(1)}</strong></td>
-            <td><strong>${totalRejWt.toFixed(1)}</strong></td>
-            <td><strong>${gtDefects.cavity || ''}</strong></td>
-            <td><strong>${gtDefects.cracks || ''}</strong></td>
-            <td><strong>${gtDefects.rCracks || ''}</strong></td>
-            <td><strong>${gtDefects.ovality || ''}</strong></td>
-            <td><strong>${gtDefects.others || ''}</strong></td>
-            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></strong></td>
-        ` : ''}
-    </tr></tbody></table></div>`;
+        sortedDays.forEach(day => {
+            const dayTotalWt = day.accWt + day.rejWt;
+            const rp = dayTotalWt > 0 ? ((day.rejWt / dayTotalWt) * 100).toFixed(1) : '0.0';
+            const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+            const totalDefects = (day.cavity || 0) + (day.cracks || 0) + (day.rCracks || 0) + (day.ovality || 0) + (day.others || 0);
 
-    container.innerHTML = tableHtml;
+            html += `<tr>
+                <td><strong>${formatDate(day.date)}</strong></td>
+                <td>${day.specialists.size} active</td>
+                <td>${day.qty}</td>
+                <td>${day.wt.toFixed(1)}</td>
+                <td class="badge-accepted">${day.acc}</td>
+                <td>${day.accWt.toFixed(1)}</td>
+                <td class="badge-rejected">${day.rej}</td>
+                <td>${day.rejWt.toFixed(1)}</td>
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+                <td style="color:var(--accent-red);">${totalDefects || '—'}</td>
+            </tr>`;
+        });
+    } else {
+        // PRODUCTION DAY LEVEL (Image 2 reference)
+        html += `<table class="report-table" style="min-width: 1600px;">
+            <thead><tr>
+                <th>Date</th><th>Shifts</th><th>Pipes (Nos)</th><th>Weight (Kg)</th>
+                <th>Acc Nos</th><th>Acc Wt</th><th>Rej Nos</th><th>Rej Wt</th><th>Rej %</th>
+                <th class="col-bl">Input (Kg)</th><th class="col-bl">Electricity</th><th class="col-bl">PNG</th>
+                <th class="col-bl">Furnace Oil</th><th class="col-bl">Tyre Oil</th><th class="col-bl">Ignite Oil</th><th class="col-bl">Labour</th>
+            </tr></thead><tbody>`;
+
+        sortedDays.forEach(day => {
+            const dayTotalWt = day.accWt + day.rejWt;
+            const rp = dayTotalWt > 0 ? ((day.rejWt / dayTotalWt) * 100).toFixed(1) : '0.0';
+            const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+
+            // Lookup Shift Data (for Input Weight/Batches)
+            const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === day.date);
+            const shiftsActive = new Set(dayShiftData.map(r => r['Shift'])).size || '—';
+            const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
+            const inputWeight = dayShiftData.reduce((s, r) => {
+                const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
+                return s + bs + l1 + l2 + rr;
+            }, 0);
+
+            // Lookup Consumptions
+            const c = dayLevelData.find(r => String(r['Date'] || '').trim() === day.date) || {};
+
+            html += `<tr>
+                <td><strong>${formatDate(day.date)}</strong></td>
+                <td>${shiftsActive}</td>
+                <td>${day.qty}</td>
+                <td>${day.wt.toFixed(1)}</td>
+                <td class="badge-accepted">${day.acc}</td>
+                <td>${day.accWt.toFixed(1)}</td>
+                <td class="badge-rejected">${day.rej}</td>
+                <td>${day.rejWt.toFixed(1)}</td>
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+                <td class="col-bl">${inputWeight.toFixed(0)} <small>(${totalBatches} bat)</small></td>
+                <td class="col-bl">${c['Electricity Consumption'] || '—'}</td>
+                <td class="col-bl">${c['PNG Consumption'] || '—'}</td>
+                <td class="col-bl">${c['Furnace Oil'] || '—'}</td>
+                <td class="col-bl">${c['Tyre Oil'] || '—'}</td>
+                <td class="col-bl">${c['Ignite Oil'] || '—'}</td>
+                <td class="col-bl">${c['Labour Qty'] || '—'}</td>
+            </tr>`;
+        });
+    }
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
 }
 
 async function exportSummaryCSV() {
