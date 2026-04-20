@@ -29,6 +29,7 @@ let currentTab = 'dashboard';
 let dailySubTab = 'production';
 let summaryPeriod = 'monthly';
 let summaryView = 'production';
+let summaryLevel = 'pipe';
 
 // ============ AUTH CHECK ============
 function checkAuth() {
@@ -2448,7 +2449,7 @@ function setSummaryPeriod(period) {
 
 function switchSummaryView(view) {
     summaryView = view;
-    document.querySelectorAll('#section-summary .daily-sub-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#section-summary .daily-controls .daily-sub-tab').forEach(b => b.classList.remove('active'));
     document.getElementById(view === 'production' ? 'btnSummaryProd' : 'btnSummaryQual')?.classList.add('active');
     
     // Show/Hide QC toggle area based on view
@@ -2456,6 +2457,19 @@ function switchSummaryView(view) {
     if (toggleArea) toggleArea.style.display = view === 'production' ? 'flex' : 'none';
     
     renderSummaryReport();
+}
+
+function setSummaryLevel(level) {
+    summaryLevel = level;
+    // Set active button (level selector buttons are in their own sub-tabs container)
+    document.getElementById('btnSummaryLvlPipe').classList.toggle('active', level === 'pipe');
+    document.getElementById('btnSummaryLvlDay').classList.toggle('active', level === 'day');
+    
+    // Toggle container visibility
+    const pipeSection = document.getElementById('sectionSummaryPipe');
+    const daySection = document.getElementById('sectionSummaryDay');
+    if (pipeSection) pipeSection.style.display = level === 'pipe' ? 'block' : 'none';
+    if (daySection) daySection.style.display = level === 'day' ? 'block' : 'none';
 }
 
 /**
@@ -2768,20 +2782,20 @@ async function exportSummaryCSV() {
     const val = summaryPeriod === 'monthly' ? document.getElementById('summaryMonth').value : document.getElementById('summaryYear').value;
     if (!val) return;
     
-    const pipeTable = document.querySelector('#summaryContent table');
-    if (!pipeTable) return;
+    // Select the table based on the CURRENT level
+    const targetId = summaryLevel === 'pipe' ? 'summaryPipeLevel' : 'summaryDayLevel';
+    const table = document.querySelector(`#${targetId} table`);
+    if (!table) return;
 
     let csv = 'sep=,\r\n';
     const headers = [];
-    pipeTable.querySelectorAll('thead th').forEach(th => headers.push(th.textContent));
+    table.querySelectorAll('thead th').forEach(th => headers.push(th.textContent));
     csv += headers.map(csvSafe).join(',') + '\r\n';
 
-    pipeTable.querySelectorAll('tbody tr').forEach(tr => {
+    table.querySelectorAll('tbody tr').forEach(tr => {
         const row = [];
         tr.querySelectorAll('td').forEach(td => {
-            // Get text and clean up (remove extra spaces/newlines)
             let text = td.textContent.trim();
-            // Remove % from rate cells for easier math in Excel
             if (td.querySelector('.badge-rate')) text = text.replace('%', '');
             row.push(text);
         });
@@ -2791,9 +2805,9 @@ async function exportSummaryCSV() {
     const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `Demech_${summaryPeriod}_Summary_${val}_${summaryView}.csv`;
+    link.download = `Demech_${summaryPeriod}_${summaryLevel}_Summary_${val}_${summaryView}.csv`;
     link.click();
-    showToast(`Summary exported successfully!`, 'success');
+    showToast(`${summaryLevel === 'pipe' ? 'Pipe' : 'Day'} summary exported!`, 'success');
 }
 
 // ============ TAB NAVIGATION ============

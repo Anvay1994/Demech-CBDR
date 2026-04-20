@@ -481,23 +481,29 @@
                 <!-- 24-hr style Summary Cards -->
                 <div id="summaryKPI" class="kpi-grid" style="margin-bottom:1.5rem;"></div>
 
-                <!-- Main Content (Tables) -->
+                <!-- View Level Selector -->
+                <div class="daily-sub-tabs" style="margin-bottom: 1.5rem; justify-content: flex-start; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem; gap: 1rem;">
+                    <button class="daily-sub-tab active" id="btnSummaryLvlPipe" onclick="setSummaryLevel('pipe')">📊 A. Product-wise Summary</button>
+                    <button class="daily-sub-tab" id="btnSummaryLvlDay" onclick="setSummaryLevel('day')">🗓️ B. Day-wise Timeline</button>
+                </div>
+
                 <!-- Main Content (Tables) -->
                 <div id="summaryContent">
-                    <div style="margin-bottom: 3rem;">
+                    <div id="sectionSummaryPipe" style="margin-bottom: 2rem;">
                         <div class="table-title" style="margin-bottom: 1rem; color: var(--text-primary); font-family: Outfit; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
                             📈 A. Pipe-wise Summary Totals
                         </div>
                         <div id="summaryPipeLevel"></div>
                     </div>
 
-                    <div style="margin-bottom: 2rem;">
+                    <div id="sectionSummaryDay" style="margin-bottom: 2rem; display: none;">
                         <div class="table-title" style="margin-bottom: 1rem; color: var(--text-primary); font-family: Outfit; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
                             🗓️ B. Day Level Performance Timeline
                         </div>
                         <div id="summaryDayLevel"></div>
                     </div>
                 </div>
+
 
             </div>
 
