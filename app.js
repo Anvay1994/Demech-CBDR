@@ -2487,7 +2487,12 @@ function renderSummaryReport() {
 
     if (summaryPeriod === 'monthly') {
         const val = document.getElementById('summaryMonth').value;
-        if (!val) { container.innerHTML = '<div class="empty-state">Select a month</div>'; return; }
+        if (!val) { 
+            kpiEl.innerHTML = '';
+            document.getElementById('summaryPipeLevel').innerHTML = '<div class="empty-state">Select a month</div>';
+            document.getElementById('summaryDayLevel').innerHTML = '<div class="empty-state">Select a month</div>';
+            return; 
+        }
         const [year, month] = val.split('-');
         periodData = allData.filter(r => {
             if (isQual && r.status !== 'QC Checked') return false;
@@ -2501,7 +2506,12 @@ function renderSummaryReport() {
     } else if (summaryPeriod === 'range') {
         const startVal = document.getElementById('summaryStartDate').value;
         const endVal = document.getElementById('summaryEndDate').value;
-        if (!startVal || !endVal) { container.innerHTML = '<div class="empty-state">Select a valid range</div>'; return; }
+        if (!startVal || !endVal) { 
+            kpiEl.innerHTML = '';
+            document.getElementById('summaryPipeLevel').innerHTML = '<div class="empty-state">Select a valid range</div>';
+            document.getElementById('summaryDayLevel').innerHTML = '<div class="empty-state">Select a valid range</div>';
+            return; 
+        }
         
         const startDate = new Date(startVal); startDate.setHours(0,0,0,0);
         const endDate = new Date(endVal); endDate.setHours(23,59,59,999);
@@ -2541,8 +2551,9 @@ function renderSummaryReport() {
     }
 
     if (periodData.length === 0) {
-        container.innerHTML = `<div class="empty-state">No data found for ${periodLabel}</div>`;
         kpiEl.innerHTML = '';
+        document.getElementById('summaryPipeLevel').innerHTML = `<div class="empty-state">No data found for ${periodLabel}</div>`;
+        document.getElementById('summaryDayLevel').innerHTML = `<div class="empty-state">No data found for ${periodLabel}</div>`;
         return;
     }
 
@@ -2654,6 +2665,7 @@ function renderSummaryReport() {
 }
 
 function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
+    if (!container) return;
     const isQualView = view === 'quality';
     const displayQC = isQualView || (view === 'production' && showQC);
     const sortedPipes = Object.values(pipeMap).sort((a,b) => a.pipeSize.localeCompare(b.pipeSize));
@@ -2695,6 +2707,7 @@ function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
 }
 
 function renderDayLevelSummaryTable(dayMap, container, view) {
+    if (!container) return;
     const isQual = view === 'quality';
     const sortedDays = Object.values(dayMap).sort((a,b) => parseDate(a.date) - parseDate(b.date));
 
