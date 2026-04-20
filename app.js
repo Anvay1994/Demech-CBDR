@@ -2183,7 +2183,8 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
                 acc: 0,
                 rej: 0,
                 accWt: 0,
-                rejWt: 0
+                rejWt: 0,
+                cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0
             };
         }
         const p = pipeSizeMap[ps];
@@ -2194,6 +2195,11 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
             p.rej += r.rejected;
             p.accWt += r.acceptedWt;
             p.rejWt += r.rejectedWt;
+            p.cavity += (r.cavity || 0);
+            p.cracks += (r.cracks || 0);
+            p.rCracks += (r.rCracks || 0);
+            p.ovality += (r.ovality || 0);
+            p.others += (r.others || 0);
         }
     });
 
@@ -2213,7 +2219,7 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
                             <th>Unit Wt (Kg)</th>
                             <th>Qty (Nos)</th>
                             <th>Prod Wt (Kg)</th>
-                            ${showQCColumns ? '<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Rej %</th>' : ''}
+                            ${showQCColumns ? '<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -2236,6 +2242,11 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
                     <td class="badge-rejected">${p.rej}</td>
                     <td>${p.accWt.toFixed(1)}</td>
                     <td>${p.rejWt.toFixed(1)}</td>
+                    <td>${p.cavity || '—'}</td>
+                    <td>${p.cracks || '—'}</td>
+                    <td>${p.rCracks || '—'}</td>
+                    <td>${p.ovality || '—'}</td>
+                    <td>${p.others || '—'}</td>
                     <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></td>
                 ` : ''}
             </tr>
@@ -2249,6 +2260,11 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
     const grandRej = pipeRows.reduce((s, p) => s + p.rej, 0);
     const grandAccWt = pipeRows.reduce((s, p) => s + p.accWt, 0);
     const grandRejWt = pipeRows.reduce((s, p) => s + p.rejWt, 0);
+    const grandCavity = pipeRows.reduce((s, p) => s + p.cavity, 0);
+    const grandCracks = pipeRows.reduce((s, p) => s + p.cracks, 0);
+    const grandRCracks = pipeRows.reduce((s, p) => s + p.rCracks, 0);
+    const grandOvality = pipeRows.reduce((s, p) => s + p.ovality, 0);
+    const grandOthers = pipeRows.reduce((s, p) => s + p.others, 0);
     const grandTotalWtQC = grandAccWt + grandRejWt;
     const grandRejPct = grandTotalWtQC > 0 ? ((grandRejWt / grandTotalWtQC) * 100).toFixed(1) : '0.0';
     const grandRateClass = parseFloat(grandRejPct) > 30 ? 'danger' : parseFloat(grandRejPct) > 15 ? 'warning' : 'good';
@@ -2263,6 +2279,11 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
                                 <td><strong>${grandRej}</strong></td>
                                 <td><strong>${grandAccWt.toFixed(1)}</strong></td>
                                 <td><strong>${grandRejWt.toFixed(1)}</strong></td>
+                                <td><strong>${grandCavity || ''}</strong></td>
+                                <td><strong>${grandCracks || ''}</strong></td>
+                                <td><strong>${grandRCracks || ''}</strong></td>
+                                <td><strong>${grandOvality || ''}</strong></td>
+                                <td><strong>${grandOthers || ''}</strong></td>
                                 <td><strong><span class="badge-rate ${grandRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${grandRejPct}%</span></strong></td>
                             ` : ''}
                         </tr>
