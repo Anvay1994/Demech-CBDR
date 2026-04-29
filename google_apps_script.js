@@ -137,10 +137,24 @@ function doGet(e) {
             var userSheet = ss.getSheetByName('Users');
             if (userSheet) {
                 var userData = userSheet.getDataRange().getValues();
-                var headers = userData[0];
-                for (var i = 1; i < userData.length; i++) {
-                    if (String(userData[i][headers.indexOf('Email')]).toLowerCase().trim() === email) {
-                        return JSON_RESPONSE({ success: true, user: { email: email, name: userData[i][headers.indexOf('Name')], role: userData[i][headers.indexOf('Role')] } });
+                var headers = userData[0].map(function(h) { return String(h).toLowerCase().trim(); });
+                
+                var emailIdx = headers.indexOf('email');
+                if (emailIdx === -1) emailIdx = headers.findIndex(function(h) { return h.includes('email'); });
+                
+                var nameIdx = headers.indexOf('name');
+                if (nameIdx === -1) nameIdx = headers.findIndex(function(h) { return h.includes('name'); });
+                
+                var roleIdx = headers.indexOf('role');
+                if (roleIdx === -1) roleIdx = headers.findIndex(function(h) { return h.includes('role'); });
+
+                if (emailIdx !== -1) {
+                    for (var i = 1; i < userData.length; i++) {
+                        if (String(userData[i][emailIdx]).toLowerCase().trim() === email) {
+                            var userName = nameIdx !== -1 ? userData[i][nameIdx] : email;
+                            var userRole = roleIdx !== -1 ? userData[i][roleIdx] : 'User';
+                            return JSON_RESPONSE({ success: true, user: { email: email, name: userName, role: userRole } });
+                        }
                     }
                 }
             }

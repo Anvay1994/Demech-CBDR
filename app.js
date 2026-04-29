@@ -1270,11 +1270,13 @@ function renderAcceptRejectChart() {
     data.forEach(row => {
         const key = keyFn(row);
         if (!groups[key]) {
-            groups[key] = { accepted: 0, rejected: 0, sortDate: parseDate(row.date) };
+            groups[key] = { accepted: 0, rejected: 0, acceptedWt: 0, rejectedWt: 0, sortDate: parseDate(row.date) };
             groupOrder.push(key);
         }
         groups[key].accepted += row.accepted;
         groups[key].rejected += row.rejected;
+        groups[key].acceptedWt += (row.acceptedWt || 0);
+        groups[key].rejectedWt += (row.rejectedWt || 0);
         const rd = parseDate(row.date);
         if (rd && (!groups[key].sortDate || rd < groups[key].sortDate)) {
             groups[key].sortDate = rd;
@@ -1616,10 +1618,12 @@ function renderSupervisorChart() {
     const supGroups = {};
     data.forEach(row => {
         if (!supGroups[row.supervisor]) {
-            supGroups[row.supervisor] = { accepted: 0, rejected: 0 };
+            supGroups[row.supervisor] = { accepted: 0, rejected: 0, acceptedWt: 0, rejectedWt: 0 };
         }
         supGroups[row.supervisor].accepted += row.accepted;
         supGroups[row.supervisor].rejected += row.rejected;
+        supGroups[row.supervisor].acceptedWt += (row.acceptedWt || 0);
+        supGroups[row.supervisor].rejectedWt += (row.rejectedWt || 0);
     });
 
     const labels = Object.keys(supGroups);
