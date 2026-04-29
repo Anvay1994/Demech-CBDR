@@ -41,10 +41,16 @@
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.col-bl { 
+td.col-bl { 
   background-color: rgba(244, 162, 97, 0.04) !important; 
   color: var(--text-secondary) !important; 
   font-weight: 400;
+  border-right: 1px solid rgba(244, 162, 97, 0.1) !important;
+}
+
+th.col-bl {
+  background-color: #1a1a2e !important;
+  color: var(--text-secondary) !important;
   border-right: 1px solid rgba(244, 162, 97, 0.1) !important;
 }
 
