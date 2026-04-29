@@ -899,13 +899,17 @@ function renderProductionSummary() {
     const tbody = document.getElementById('prodSummaryBody');
     tbody.innerHTML = '';
 
-    // Group by supervisor (Simple list)
+    // Group by supervisor and shift
     const supGroups = {};
     data.forEach(row => {
         const sup = row.supervisor || '—';
-        if (!supGroups[sup]) {
-            supGroups[sup] = {
+        const shift = row.shift || '—';
+        const key = `${sup}_${shift}`;
+        
+        if (!supGroups[key]) {
+            supGroups[key] = {
                 supervisor: sup,
+                shift: shift,
                 totalPipes: 0,
                 accepted: 0,
                 rejected: 0,
@@ -914,22 +918,27 @@ function renderProductionSummary() {
                 rejectedWt: 0
             };
         }
-        supGroups[sup].totalPipes += row.totalPipes;
-        supGroups[sup].accepted += row.accepted;
-        supGroups[sup].rejected += row.rejected;
-        supGroups[sup].totalWt += row.totalWt;
-        supGroups[sup].acceptedWt += row.acceptedWt;
-        supGroups[sup].rejectedWt += row.rejectedWt;
+        supGroups[key].totalPipes += row.totalPipes;
+        supGroups[key].accepted += row.accepted;
+        supGroups[key].rejected += row.rejected;
+        supGroups[key].totalWt += row.totalWt;
+        supGroups[key].acceptedWt += row.acceptedWt;
+        supGroups[key].rejectedWt += row.rejectedWt;
     });
 
     let srNo = 1;
-    Object.values(supGroups).sort((a, b) => a.supervisor.localeCompare(b.supervisor)).forEach(group => {
+    Object.values(supGroups).sort((a, b) => {
+        const supCmp = a.supervisor.localeCompare(b.supervisor);
+        if (supCmp !== 0) return supCmp;
+        return a.shift.toString().localeCompare(b.shift.toString());
+    }).forEach(group => {
         const rejPct = group.totalWt > 0 ? ((group.rejectedWt / group.totalWt) * 100).toFixed(1) : '0.0';
         const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${srNo++}</td>
+            <td><strong>${group.shift}</strong></td>
             <td><strong>${group.supervisor}</strong></td>
             <td>${group.totalPipes}</td>
             <td>${group.accepted}</td>
