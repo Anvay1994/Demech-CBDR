@@ -19,6 +19,50 @@ const SHEETS = {
     dayLevel: 'Day Level Data'
 };
 
+const PIPE_MASTER_ORDER = [
+    "P _53*350*20", "P _67*350*20", "P _78*400*20", "P _94*500*24.5", "P _103*500*20", 
+    "P _110*500*29", "P _128*500*20", "P _140*500*27", "P _143.7*500*24.5", "P _153*500*20", 
+    "P _173*500*26", "P _178*500*20", "P _185*500*20", "P _186*500*28.5", "P _193*500*25", 
+    "P _203*500*30", "P _203*500*20", "P _216*500*20", "P _218*500*20", "P _228*500*20", 
+    "P _232*500*20", "P _243*500*24", "P _248*500*20", "P _253*500*20", "P _260*500*20", 
+    "P _273*500*27", "P _287*500*20", "P _293*500*24.5", "P _297*500*23", "P _303*500*20", 
+    "P _305*500*30.5", "P _315*500*20", "P _320*500*25", "P _336*500*20", "P _341*500*20", 
+    "P _342*500*24.5", "P _345*500*20", "P _356*500*20", "P _356*600*20", "P _370*500*20", 
+    "P _386*500*20", "P _400*500*30", "P _406*600*20", "P _420*500*20", "P _432*500*20", 
+    "P _436*500*20", "P _456*500*20", "P _450*500*25", "P _480*400*24", "P _489*400*20", 
+    "P _489*500*20", "T _550*350*50", "T _250*350*50", "P _585*400*25", "R _**", "P _598*400*25"
+];
+
+function formatPipeSize(raw) {
+    if (!raw) return '—';
+    if (raw.includes('_') && raw.includes('*')) return raw;
+    const formattedDims = raw.replace(/x/ig, '*');
+    const match = PIPE_MASTER_ORDER.find(p => p.includes(formattedDims));
+    if (match) return match;
+    // Missing items have NO prefix so they stand out as mistakes
+    return formattedDims;
+}
+
+function getPipeSortScore(pipeSizeStr) {
+    let typeScore = 40000; // Mistakes / No Prefix
+    if (pipeSizeStr.startsWith('P _')) typeScore = 10000; // Pipe
+    else if (pipeSizeStr.startsWith('T _')) typeScore = 20000; // Trench
+    else if (pipeSizeStr.startsWith('R _')) typeScore = 30000; // Reducer
+    
+    let idx = PIPE_MASTER_ORDER.indexOf(pipeSizeStr);
+    if (idx === -1) idx = 9999; // Unknown goes to end of its respective type block
+    
+    return typeScore + idx;
+}
+
+function sortPipes(a, b) {
+    const scoreA = getPipeSortScore(a);
+    const scoreB = getPipeSortScore(b);
+    
+    if (scoreA !== scoreB) return scoreA - scoreB;
+    return a.localeCompare(b);
+}
+
 // ============ STATE ============
 let allData = [];
 let pipeMasterData = [];
@@ -321,7 +365,7 @@ function transformReportData(rawData) {
             loadingTime: formatTimeLocal(lTimeRaw),
             qcTime: formatTimeLocal(qTimeRaw),
             hoursCycle: calculateCycleTime(lDateRaw, lTimeRaw, rawQcDate, qTimeRaw),
-            pipeSize: row['Pipe Size_Calculated'] || '',
+            pipeSize: formatPipeSize(row['Pipe Size_Calculated']),
             trolleyNo: trolleyNo,
             prodRej: parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0,
             prodRejWt: (parseFloat(row['Prod Rej'] || row['Prod. Rej.'] || 0) || 0) * wtPerPipe,
@@ -625,7 +669,7 @@ function resetFilters() {
 
 function populateFilterOptions() {
     const supervisors = [...new Set(allData.map(r => r.supervisor))].sort();
-    const pipeSizes = [...new Set(allData.map(r => r.pipeSize))].filter(Boolean).sort();
+    const pipeSizes = [...new Set(allData.map(r => r.pipeSize))].filter(Boolean).sort(sortPipes);
     const trolleys = [...new Set(allData.map(r => r.trolleyNo))].filter(Boolean).sort();
     
     // Collect all unique QC names (handling comma separation)
@@ -1924,7 +1968,7 @@ function renderDailyProduction(dateInfo, container) {
             }
         });
         
-        const pipeRows = Object.values(pipeSizeMap);
+        const pipeRows = Object.values(pipeSizeMap).sort((a, b) => sortPipes(a.pipeSize, b.pipeSize));
         const totalQty = pipeRows.reduce((sum, p) => sum + p.qty, 0);
         const totalWt = pipeRows.reduce((sum, p) => sum + p.totalWt, 0);
 
@@ -2135,7 +2179,7 @@ function renderDailyQuality(dateInfo, container) {
             pipeSizeMap[ps].ovality += r.ovality;
             pipeSizeMap[ps].others += r.others;
         });
-        const pipeRows = Object.values(pipeSizeMap);
+        const pipeRows = Object.values(pipeSizeMap).sort((a, b) => sortPipes(a.pipeSize, b.pipeSize));
 
         pipeRows.forEach((p, idx) => {
             const pTotalWt = p.accWt + p.rejWt;
@@ -2207,7 +2251,7 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
         }
     });
 
-    const pipeRows = Object.values(pipeSizeMap).sort((a, b) => a.pipeSize.localeCompare(b.pipeSize));
+    const pipeRows = Object.values(pipeSizeMap).sort((a, b) => sortPipes(a.pipeSize, b.pipeSize));
 
     let html = `
         <div class="daily-summary-pipe-section" style="margin-bottom: 2rem;">
@@ -2693,7 +2737,7 @@ function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
     if (!container) return;
     const isQualView = view === 'quality';
     const displayQC = isQualView || (view === 'production' && showQC);
-    const sortedPipes = Object.values(pipeMap).sort((a,b) => a.pipeSize.localeCompare(b.pipeSize));
+    const sortedPipes = Object.values(pipeMap).sort((a,b) => sortPipes(a.pipeSize, b.pipeSize));
 
     let html = `<div class="report-table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">
         <table class="report-table" style="min-width: ${displayQC ? '1400px' : '100%'};">
