@@ -2398,7 +2398,7 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
         const dayLevel = dayLevelData.find(r => String(r['Date'] || '').trim() === dateInfo.display);
         const electricity = dayLevel ? (dayLevel['Electricity Consumption'] || '—') : '—';
         const png = dayLevel ? (dayLevel['PNG Consumption'] || '—') : '—';
-        const furnaceOil = dayLevel ? (dayLevel['Furnace Oil'] || '—') : '—';
+        const wireMesh = dayLevel ? (dayLevel['Wire Mesh'] || '—') : '—';
         const tyreOil = dayLevel ? (dayLevel['Tyre Oil'] || '—') : '—';
         const igniteOil = dayLevel ? (dayLevel['Ignite Oil'] || '—') : '—';
         const labourQty = dayLevel ? (dayLevel['Labour Qty'] || '—') : '—';
@@ -2418,7 +2418,7 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
             <div class="daily-summary-grid consumption-grid-detailed" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-glass);">
                 <div class="daily-summary-item"><div class="ds-label">Electricity</div><div class="ds-value" style="color: var(--accent-blue);">${electricity}</div><div class="ds-unit">Consumption</div></div>
                 <div class="daily-summary-item"><div class="ds-label">PNG</div><div class="ds-value" style="color: var(--accent-blue);">${png}</div><div class="ds-unit">Consumption</div></div>
-                <div class="daily-summary-item"><div class="ds-label">Furnace Oil</div><div class="ds-value" style="color: var(--accent-purple);">${furnaceOil}</div><div class="ds-unit">Ltrs</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Wire Mesh</div><div class="ds-value" style="color: var(--accent-purple);">${wireMesh}</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Tyre Oil</div><div class="ds-value" style="color: var(--accent-purple);">${tyreOil}</div><div class="ds-unit">Ltrs</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Ignite Oil</div><div class="ds-value" style="color: var(--accent-purple);">${igniteOil}</div><div class="ds-unit">Ltrs</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Labour Qty</div><div class="ds-value" style="color: var(--accent-green);">${labourQty}</div><div class="ds-unit">Workers</div></div>
@@ -2874,7 +2874,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
                 <th>Date</th><th>Shifts</th><th>Pipes (Nos)</th><th>Weight (Kg)</th>
                 <th>Acc Nos</th><th>Acc Wt</th><th>Rej Nos</th><th>Rej Wt</th><th>Rej %</th>
                 <th class="col-bl">Input (Kg)</th><th class="col-bl">Electricity</th><th class="col-bl">PNG</th>
-                <th class="col-bl">Furnace Oil</th><th class="col-bl">Tyre Oil</th><th class="col-bl">Ignite Oil</th><th class="col-bl">Labour</th>
+                <th class="col-bl">Wire Mesh</th><th class="col-bl">Tyre Oil</th><th class="col-bl">Ignite Oil</th><th class="col-bl">Labour</th>
             </tr></thead><tbody>`;
 
         sortedDays.forEach(day => {
@@ -2907,7 +2907,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
                 <td class="col-bl">${inputWeight.toFixed(0)} <small>(${totalBatches} bat)</small></td>
                 <td class="col-bl">${c['Electricity Consumption'] || '—'}</td>
                 <td class="col-bl">${c['PNG Consumption'] || '—'}</td>
-                <td class="col-bl">${c['Furnace Oil'] || '—'}</td>
+                <td class="col-bl">${c['Wire Mesh'] || '—'}</td>
                 <td class="col-bl">${c['Tyre Oil'] || '—'}</td>
                 <td class="col-bl">${c['Ignite Oil'] || '—'}</td>
                 <td class="col-bl">${c['Labour Qty'] || '—'}</td>
@@ -2923,7 +2923,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
             accWt: sortedDays.reduce((s,d) => s + d.accWt, 0),
             rejWt: sortedDays.reduce((s,d) => s + d.rejWt, 0),
             input: 0, batches: 0,
-            elec: 0, png: 0, fOil: 0, tOil: 0, iOil: 0, labour: 0
+            elec: 0, png: 0, wMesh: 0, tOil: 0, iOil: 0, labour: 0
         };
         
         sortedDays.forEach(day => {
@@ -2936,7 +2936,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
             const c = dayLevelData.find(r => String(r['Date'] || '').trim() === day.date) || {};
             gt.elec += parseFloat(c['Electricity Consumption'] || 0);
             gt.png += parseFloat(c['PNG Consumption'] || 0);
-            gt.fOil += parseFloat(c['Furnace Oil'] || 0);
+            gt.wMesh += parseFloat(c['Wire Mesh'] || 0);
             gt.tOil += parseFloat(c['Tyre Oil'] || 0);
             gt.iOil += parseFloat(c['Ignite Oil'] || 0);
             gt.labour += parseFloat(c['Labour Qty'] || 0);
@@ -2956,7 +2956,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
             <td class="col-bl"><strong>${gt.input.toFixed(0)} <small>(${gt.batches})</small></strong></td>
             <td class="col-bl"><strong>${gt.elec.toFixed(0)}</strong></td>
             <td class="col-bl"><strong>${gt.png.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.fOil.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.wMesh.toFixed(0)}</strong></td>
             <td class="col-bl"><strong>${gt.tOil.toFixed(0)}</strong></td>
             <td class="col-bl"><strong>${gt.iOil.toFixed(0)}</strong></td>
             <td class="col-bl"><strong>${gt.labour.toFixed(0)}</strong></td>
