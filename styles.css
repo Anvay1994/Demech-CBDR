@@ -685,6 +685,55 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-bottom-color: var(--accent-blue);
 }
 
+/* --- Furnace Selector (inline with page tabs) --- */
+.furnace-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: auto;
+  padding: 0.5rem 0;
+}
+.furnace-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.furnace-tabs {
+  display: flex;
+  gap: 2px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 3px;
+}
+.furnace-tab {
+  padding: 0.3rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  line-height: 1.3;
+}
+.furnace-tab:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+}
+.furnace-tab.active {
+  background: linear-gradient(135deg, #c05c10, #d96b18);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(217,107,24,0.35);
+}
+
 /* --- Main Content --- */
 .main-content {
   padding: 1.5rem 2rem;

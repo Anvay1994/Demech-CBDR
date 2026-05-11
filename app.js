@@ -74,6 +74,31 @@ let dailySubTab = 'production';
 let summaryPeriod = 'monthly';
 let summaryView = 'production';
 let summaryLevel = 'pipe';
+let selectedFurnace = 'F2'; // Default to F2 (currently operational)
+
+// Returns allData filtered by the current furnace selection
+function getDataForFurnace() {
+    if (selectedFurnace === 'all') return allData;
+    return allData.filter(r => r.furnaceNum === selectedFurnace);
+}
+
+// Returns shiftLevelData filtered by the current furnace selection
+function getShiftDataForFurnace() {
+    if (selectedFurnace === 'all') return shiftLevelData;
+    return shiftLevelData.filter(r => {
+        const f = String(r['Furnace Num'] || '').trim().toUpperCase();
+        return f === selectedFurnace;
+    });
+}
+
+function setFurnace(furnace) {
+    selectedFurnace = furnace;
+    document.querySelectorAll('.furnace-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.furnace-tab[data-furnace="${furnace}"]`)?.classList.add('active');
+    // Re-populate filters for the selected furnace scope, then re-render
+    populateFilterOptions();
+    applyFilters();
+}
 
 // ============ AUTH CHECK ============
 function checkAuth() {
@@ -381,7 +406,8 @@ function transformReportData(rawData) {
             others: parseInt(row['Others']) || 0,
             acceptedWt,
             rejectedWt: Math.abs(rejectedWt),
-            status: (row['Status'] || '').trim()
+            status: (row['Status'] || '').trim(),
+            furnaceNum: (row['Furnace Num'] || '').trim().toUpperCase() || 'Unknown'
         };
     }).filter(r => (r.date && r.date !== "") || (r.totalPipes > 0) || (r.qcName && r.qcName !== ""));
 
@@ -389,7 +415,7 @@ function transformReportData(rawData) {
     const aggMap = {};
     transformed.forEach(r => {
         // Group by Date, Shift, QC Date, QC Shift, Supervisor, Pipe Size AND Trolley No for subtotals
-        const key = `${r.date}|${r.shift}|${r.qcDate}|${r.qcShift}|${r.supervisor}|${r.pipeSize}|${r.trolleyNo}`;
+        const key = `${r.date}|${r.shift}|${r.qcDate}|${r.qcShift}|${r.supervisor}|${r.pipeSize}|${r.trolleyNo}|${r.furnaceNum}`;
         if (!aggMap[key]) {
             aggMap[key] = {
                 sourceRows: [],
@@ -420,6 +446,7 @@ function transformReportData(rawData) {
                 others: 0,
                 acceptedWt: 0,
                 rejectedWt: 0,
+                furnaceNum: r.furnaceNum,
                 statuses: new Set()
             };
         }
@@ -614,7 +641,8 @@ function applyFilters() {
     const pipeSize = document.getElementById('filterPipeSize')?.value;
     const trolley = document.getElementById('filterTrolley')?.value;
 
-    filteredData = allData.filter(row => {
+    const furnaceScoped = getDataForFurnace();
+    filteredData = furnaceScoped.filter(row => {
         const isQualityTab = (currentTab === 'quality');
         const rowDateToCompare = isQualityTab ? row.qcDate : row.date;
 
@@ -668,13 +696,14 @@ function resetFilters() {
 }
 
 function populateFilterOptions() {
-    const supervisors = [...new Set(allData.map(r => r.supervisor))].sort();
-    const pipeSizes = [...new Set(allData.map(r => r.pipeSize))].filter(Boolean).sort(sortPipes);
-    const trolleys = [...new Set(allData.map(r => r.trolleyNo))].filter(Boolean).sort();
+    const furnaceScoped = getDataForFurnace();
+    const supervisors = [...new Set(furnaceScoped.map(r => r.supervisor))].sort();
+    const pipeSizes = [...new Set(furnaceScoped.map(r => r.pipeSize))].filter(Boolean).sort(sortPipes);
+    const trolleys = [...new Set(furnaceScoped.map(r => r.trolleyNo))].filter(Boolean).sort();
     
     // Collect all unique QC names (handling comma separation)
     const qcSet = new Set();
-    allData.forEach(r => {
+    furnaceScoped.forEach(r => {
         (r.qcName || '').split(',').forEach(n => {
             const name = n.trim();
             if (name && name !== '—') qcSet.add(name);
@@ -1903,9 +1932,9 @@ function getShiftLabel(raw) {
 
 function renderDailyProduction(dateInfo, container) {
     // Filter production data for this date
-    const dayData = allData.filter(r => r.date === dateInfo.display);
-    // Filter shift level data for this date
-    const dayShiftData = shiftLevelData.filter(r => {
+    const dayData = getDataForFurnace().filter(r => r.date === dateInfo.display);
+    // Filter shift level data for this date (and furnace)
+    const dayShiftData = getShiftDataForFurnace().filter(r => {
         const d = String(r['Date'] || '').trim();
         return d === dateInfo.display;
     });
@@ -2099,9 +2128,9 @@ function renderDailyProduction(dateInfo, container) {
 
 function renderDailyQuality(dateInfo, container) {
     // Filter QC data for this date — only show QC Checked entries based on Date for Output
-    const dayData = allData.filter(r => r.qcDate === dateInfo.display && r.status === 'QC Checked');
+    const dayData = getDataForFurnace().filter(r => r.qcDate === dateInfo.display && r.status === 'QC Checked');
     // Tunnel count based on production date (for pipes produced today but still awaiting check)
-    const tunnelCount = allData.filter(r => r.date === dateInfo.display && r.status === 'Inside Tunnel').reduce((s, r) => s + r.totalPipes, 0);
+    const tunnelCount = getDataForFurnace().filter(r => r.date === dateInfo.display && r.status === 'Inside Tunnel').reduce((s, r) => s + r.totalPipes, 0);
 
     if (dayData.length === 0 && tunnelCount === 0) {
         container.innerHTML = `<div class="daily-empty"><span class="empty-icon">📭</span>No quality data for ${formatDate(dateInfo.display)}</div>`;
@@ -2354,7 +2383,7 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
 
 function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC = false) {
     const isQual = mode === 'quality';
-    const dayData = allData.filter(r => (isQual ? r.qcDate : r.date) === dateInfo.display);
+    const dayData = getDataForFurnace().filter(r => (isQual ? r.qcDate : r.date) === dateInfo.display);
     if (dayData.length === 0) { container.innerHTML = ''; return; }
 
     container.innerHTML = ''; // Start clean
@@ -2393,7 +2422,7 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
     } else {
         // Production Specific Calculations
         const shiftsActive = new Set(dayData.map(r => r.shift)).size;
-        const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateInfo.display);
+        const dayShiftData = getShiftDataForFurnace().filter(r => String(r['Date'] || '').trim() === dateInfo.display);
         const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch']) || 0), 0);
         const totalInputKg = dayShiftData.reduce((s, r) => {
             const bs = parseFloat(r['Input KG_BS'] || 0);
@@ -2424,7 +2453,8 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
             </div>
 
             <!-- Consumption & Labour Summary -->
-            <div class="daily-summary-grid consumption-grid-detailed" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-glass);">
+            ${selectedFurnace !== 'all' ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:1.25rem;font-style:italic;display:flex;align-items:center;gap:0.4rem;">ℹ️ Plant-wide consumption — common for F1 & F2</div>' : ''}
+            <div class="daily-summary-grid consumption-grid-detailed" style="margin-top: ${selectedFurnace !== 'all' ? '0.5rem' : '1.5rem'}; padding-top: 1.5rem; border-top: 1px solid var(--border-glass);">
                 <div class="daily-summary-item"><div class="ds-label">Electricity</div><div class="ds-value" style="color: var(--accent-blue);">${electricity}</div><div class="ds-unit">Consumption</div></div>
                 <div class="daily-summary-item"><div class="ds-label">PNG</div><div class="ds-value" style="color: var(--accent-blue);">${png}</div><div class="ds-unit">Consumption</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Wire Mesh</div><div class="ds-value" style="color: var(--accent-purple);">${wireMesh}</div></div>
@@ -2457,7 +2487,7 @@ function exportMonthlyCSV() {
         const dd = String(day).padStart(2, '0');
         const mm = String(month).padStart(2, '0');
         const dateStr = `${dd}-${mm}-${year}`;
-        const dayRows = allData.filter(r => r.date === dateStr);
+        const dayRows = getDataForFurnace().filter(r => r.date === dateStr);
 
         const byShift = { 'I': { pipes: 0, wt: 0 }, 'II': { pipes: 0, wt: 0 }, 'III': { pipes: 0, wt: 0 } };
         let dayPipes = 0, dayWt = 0, dayAcc = 0, dayRej = 0, dayAccWt = 0, dayRejWt = 0;
@@ -2572,7 +2602,7 @@ function renderSummaryReport() {
             return; 
         }
         const [year, month] = val.split('-');
-        periodData = allData.filter(r => {
+        periodData = getDataForFurnace().filter(r => {
             if (isQual && r.status !== 'QC Checked') return false;
             const d = r[dateField];
             if (!d) return false;
@@ -2594,7 +2624,7 @@ function renderSummaryReport() {
         const startDate = new Date(startVal); startDate.setHours(0,0,0,0);
         const endDate = new Date(endVal); endDate.setHours(23,59,59,999);
         
-        periodData = allData.filter(r => {
+        periodData = getDataForFurnace().filter(r => {
             if (isQual && r.status !== 'QC Checked') return false;
             const dStr = r[dateField];
             if (!dStr) return false;
@@ -2605,7 +2635,7 @@ function renderSummaryReport() {
         periodLabel = `Range: ${formatDate(startVal)} to ${formatDate(endVal)}`;
     } else {
         const val = document.getElementById('summaryYear').value; // e.g. "24-25", "25-26", "26-27"
-        periodData = allData.filter(r => {
+        periodData = getDataForFurnace().filter(r => {
             if (isQual && r.status !== 'QC Checked') return false;
             const d = r[dateField];
             if (!d) return false;
@@ -3274,7 +3304,7 @@ function runErrorChecks(data, pipeMaster) {
     if (shiftLevelData && shiftLevelData.length > 0) {
         // Group allData by date and shift
         const aggregated = {};
-        allData.forEach(r => {
+        getDataForFurnace().forEach(r => {
             const key = `${r.date}|${r.shift}`;
             if (!aggregated[key]) aggregated[key] = { pipes: 0, wt: 0 };
             aggregated[key].pipes += r.totalPipes;
@@ -3548,7 +3578,7 @@ function setDefaultDateRange() {
 
     // Find the latest date in data, but don't exceed today
     let maxDate = today;
-    const allDates = allData.map(r => parseDate(r.date)).filter(d => d && !isNaN(d.getTime()));
+    const allDates = getDataForFurnace().map(r => parseDate(r.date)).filter(d => d && !isNaN(d.getTime()));
     
     if (allDates.length > 0) {
         const latestDataDate = new Date(Math.max(...allDates));

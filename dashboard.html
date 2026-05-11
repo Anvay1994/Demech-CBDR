@@ -48,6 +48,15 @@
             <div class="page-tab" data-tab="quality" onclick="switchTab('quality')">🔍 Quality Report</div>
             <div class="page-tab" data-tab="dataquality" onclick="switchTab('dataquality')">⚠ Data Quality <span
                     class="error-badge" id="errorBadge" style="display:none;">0</span></div>
+            <!-- Furnace Selector -->
+            <div class="furnace-selector" id="furnaceSelector">
+                <span class="furnace-label">🔥 Furnace</span>
+                <div class="furnace-tabs">
+                    <button class="furnace-tab" data-furnace="F1" onclick="setFurnace('F1')">F1</button>
+                    <button class="furnace-tab active" data-furnace="F2" onclick="setFurnace('F2')">F2</button>
+                    <button class="furnace-tab" data-furnace="all" onclick="setFurnace('all')">Both</button>
+                </div>
+            </div>
         </div>
 
         <!-- ========== FILTERS BAR ========== -->
