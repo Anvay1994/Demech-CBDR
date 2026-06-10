@@ -91,6 +91,65 @@ function getShiftDataForFurnace() {
     });
 }
 
+// Returns aggregated/filtered dayLevelData for the given date based on current furnace selection
+function getDayLevelDataForDate(dateStr) {
+    const formattedDate = String(dateStr || '').trim();
+    if (!formattedDate) return null;
+
+    const dateMatches = dayLevelData.filter(r => String(r['Date'] || '').trim() === formattedDate);
+    if (dateMatches.length === 0) return null;
+
+    if (selectedFurnace !== 'all') {
+        // Find row specifically for selected furnace
+        // Handle empty/missing furnace values as unknown
+        return dateMatches.find(r => {
+            const f = String(r['Furnace Num'] || '').trim().toUpperCase();
+            return f === selectedFurnace;
+        }) || null;
+    } else {
+        // Combine all matching rows for the same date (e.g. F1 and F2 records)
+        const aggregated = {
+            'Date': dateStr,
+            'Electricity Consumption': null,
+            'PNG Consumption': null,
+            'Wire Mesh': null,
+            'Tyre Oil': null,
+            'Ignite Oil': null,
+            'Labour Qty': null,
+            'Furnace Num': 'Both'
+        };
+        let hasData = false;
+        dateMatches.forEach(r => {
+            hasData = true;
+            const elecVal = r['Electricity Consumption'];
+            if (elecVal !== undefined && elecVal !== null && elecVal !== '' && elecVal !== '—') {
+                aggregated['Electricity Consumption'] = (aggregated['Electricity Consumption'] || 0) + parseFloat(elecVal);
+            }
+            const pngVal = r['PNG Consumption'];
+            if (pngVal !== undefined && pngVal !== null && pngVal !== '' && pngVal !== '—') {
+                aggregated['PNG Consumption'] = (aggregated['PNG Consumption'] || 0) + parseFloat(pngVal);
+            }
+            const wmVal = r['Wire Mesh'];
+            if (wmVal !== undefined && wmVal !== null && wmVal !== '' && wmVal !== '—') {
+                aggregated['Wire Mesh'] = (aggregated['Wire Mesh'] || 0) + parseFloat(wmVal);
+            }
+            const toVal = r['Tyre Oil'];
+            if (toVal !== undefined && toVal !== null && toVal !== '' && toVal !== '—') {
+                aggregated['Tyre Oil'] = (aggregated['Tyre Oil'] || 0) + parseFloat(toVal);
+            }
+            const ioVal = r['Ignite Oil'];
+            if (ioVal !== undefined && ioVal !== null && ioVal !== '' && ioVal !== '—') {
+                aggregated['Ignite Oil'] = (aggregated['Ignite Oil'] || 0) + parseFloat(ioVal);
+            }
+            const labVal = r['Labour Qty'];
+            if (labVal !== undefined && labVal !== null && labVal !== '' && labVal !== '—') {
+                aggregated['Labour Qty'] = (aggregated['Labour Qty'] || 0) + parseFloat(labVal);
+            }
+        });
+        return hasData ? aggregated : null;
+    }
+}
+
 function setFurnace(furnace) {
     selectedFurnace = furnace;
     document.querySelectorAll('.furnace-tab').forEach(t => t.classList.remove('active'));
@@ -2433,13 +2492,16 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
         }, 0);
 
         // --- Consumption Data from Day Level Data ---
-        const dayLevel = dayLevelData.find(r => String(r['Date'] || '').trim() === dateInfo.display);
+        const dayLevel = getDayLevelDataForDate(dateInfo.display);
         const electricity = dayLevel ? (dayLevel['Electricity Consumption'] || '—') : '—';
         const png = dayLevel ? (dayLevel['PNG Consumption'] || '—') : '—';
         const wireMesh = dayLevel ? (dayLevel['Wire Mesh'] || '—') : '—';
         const tyreOil = dayLevel ? (dayLevel['Tyre Oil'] || '—') : '—';
         const igniteOil = dayLevel ? (dayLevel['Ignite Oil'] || '—') : '—';
         const labourQty = dayLevel ? (dayLevel['Labour Qty'] || '—') : '—';
+
+        // Show plant-wide note only if selected furnace is specific but the data found has no furnace number (meaning it's old plant-wide data)
+        const showPlantWideNote = selectedFurnace !== 'all' && dayLevel && !String(dayLevel['Furnace Num'] || '').trim();
 
         container.innerHTML += `<div class="daily-summary-card">
             <h4>📊 24-Hour Production Summary — ${formatDate(dateInfo.display)}</h4>
@@ -2453,8 +2515,8 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
             </div>
 
             <!-- Consumption & Labour Summary -->
-            ${selectedFurnace !== 'all' ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:1.25rem;font-style:italic;display:flex;align-items:center;gap:0.4rem;">ℹ️ Plant-wide consumption — common for F1 & F2</div>' : ''}
-            <div class="daily-summary-grid consumption-grid-detailed" style="margin-top: ${selectedFurnace !== 'all' ? '0.5rem' : '1.5rem'}; padding-top: 1.5rem; border-top: 1px solid var(--border-glass);">
+            ${showPlantWideNote ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:1.25rem;font-style:italic;display:flex;align-items:center;gap:0.4rem;">ℹ️ Plant-wide consumption — common for F1 & F2</div>' : ''}
+            <div class="daily-summary-grid consumption-grid-detailed" style="margin-top: ${showPlantWideNote ? '0.5rem' : '1.5rem'}; padding-top: 1.5rem; border-top: 1px solid var(--border-glass);">
                 <div class="daily-summary-item"><div class="ds-label">Electricity</div><div class="ds-value" style="color: var(--accent-blue);">${electricity}</div><div class="ds-unit">Consumption</div></div>
                 <div class="daily-summary-item"><div class="ds-label">PNG</div><div class="ds-value" style="color: var(--accent-blue);">${png}</div><div class="ds-unit">Consumption</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Wire Mesh</div><div class="ds-value" style="color: var(--accent-purple);">${wireMesh}</div></div>
@@ -2931,7 +2993,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
             }, 0);
 
             // Lookup Consumptions
-            const c = dayLevelData.find(r => String(r['Date'] || '').trim() === day.date) || {};
+            const c = getDayLevelDataForDate(day.date) || {};
 
             html += `<tr>
                 <td><strong>${formatDate(day.date)}</strong></td>
@@ -2972,7 +3034,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
                 const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
                 return s + bs + l1 + l2 + rr;
             }, 0);
-            const c = dayLevelData.find(r => String(r['Date'] || '').trim() === day.date) || {};
+            const c = getDayLevelDataForDate(day.date) || {};
             gt.elec += parseFloat(c['Electricity Consumption'] || 0);
             gt.png += parseFloat(c['PNG Consumption'] || 0);
             gt.wMesh += parseFloat(c['Wire Mesh'] || 0);
