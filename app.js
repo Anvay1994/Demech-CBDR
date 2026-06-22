@@ -19,7 +19,7 @@ const SHEETS = {
     dayLevel: 'Day Level Data'
 };
 
-const PIPE_MASTER_ORDER = [
+let PIPE_MASTER_ORDER = [
     "P _598*400*25", "P _585*400*25", "P _489*400*20", "P _489*500*20", "P _480*400*24",
     "P _456*500*20", "P _450*500*25", "P _436*500*20", "P _432*500*20", "P _420*500*20",
     "P _406*600*20", "P _400*500*30", "P _386*500*20", "P _370*500*20", "P _356*500*20",
@@ -45,9 +45,9 @@ function formatPipeSize(raw) {
 
 function getPipeSortScore(pipeSizeStr) {
     let typeScore = 40000; // Mistakes / No Prefix
-    if (pipeSizeStr.startsWith('P _')) typeScore = 10000; // Pipe
-    else if (pipeSizeStr.startsWith('T _')) typeScore = 20000; // Trench
-    else if (pipeSizeStr.startsWith('R _')) typeScore = 30000; // Reducer
+    if (pipeSizeStr.startsWith('P _') || pipeSizeStr.startsWith('P_')) typeScore = 10000; // Pipe
+    else if (pipeSizeStr.startsWith('T _') || pipeSizeStr.startsWith('T_')) typeScore = 20000; // Trench
+    else if (pipeSizeStr.startsWith('R _') || pipeSizeStr.startsWith('R_')) typeScore = 30000; // Reducer
     
     let idx = PIPE_MASTER_ORDER.indexOf(pipeSizeStr);
     if (idx === -1) idx = 9999; // Unknown goes to end of its respective type block
@@ -61,6 +61,37 @@ function sortPipes(a, b) {
     
     if (scoreA !== scoreB) return scoreA - scoreB;
     return a.localeCompare(b);
+}
+
+function updatePipeMasterOrder(pmData) {
+    if (!pmData || pmData.length === 0) return;
+    
+    const newOrder = [];
+    
+    // Add dynamically found unique pipe sizes
+    pmData.forEach(row => {
+        let uniqueSize = row['Unique Pipe Size'] || row['Unique Pipe Size '];
+        if (uniqueSize) {
+            uniqueSize = uniqueSize.trim();
+            if (!newOrder.includes(uniqueSize)) {
+                newOrder.push(uniqueSize);
+            }
+            // Add a "P _" spaced version just for backward compatibility with old hardcoded array if needed
+            const spaced = uniqueSize.replace(/^([PTR])_/, '$1 _');
+            if (spaced !== uniqueSize && !newOrder.includes(spaced)) {
+                newOrder.push(spaced);
+            }
+        }
+    });
+    
+    // Merge existing hardcoded order items that weren't dynamically found
+    PIPE_MASTER_ORDER.forEach(item => {
+        if (!newOrder.includes(item)) {
+            newOrder.push(item);
+        }
+    });
+    
+    PIPE_MASTER_ORDER = newOrder;
 }
 
 // ============ STATE ============
@@ -3571,8 +3602,9 @@ async function initApp() {
             fetchSheetData(SHEETS.dayLevel).catch(() => [])
         ]);
 
-        allData = transformReportData(rawData);
         pipeMasterData = rawPipeMaster || [];
+        updatePipeMasterOrder(pipeMasterData);
+        allData = transformReportData(rawData);
         shiftLevelData = rawShiftLevel || [];
         dayLevelData = rawDayLevel || [];
 
