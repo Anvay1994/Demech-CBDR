@@ -43,23 +43,35 @@ function formatPipeSize(raw) {
     return formattedDims;
 }
 
-function getPipeSortScore(pipeSizeStr) {
-    let typeScore = 40000; // Mistakes / No Prefix
-    if (pipeSizeStr.startsWith('P _') || pipeSizeStr.startsWith('P_')) typeScore = 10000; // Pipe
-    else if (pipeSizeStr.startsWith('T _') || pipeSizeStr.startsWith('T_')) typeScore = 20000; // Trench
-    else if (pipeSizeStr.startsWith('R _') || pipeSizeStr.startsWith('R_')) typeScore = 30000; // Reducer
-    
-    let idx = PIPE_MASTER_ORDER.indexOf(pipeSizeStr);
-    if (idx === -1) idx = 9999; // Unknown goes to end of its respective type block
-    
-    return typeScore + idx;
+function getPipeTypeScore(pipeSizeStr) {
+    if (!pipeSizeStr) return 4;
+    if (pipeSizeStr.startsWith('P _') || pipeSizeStr.startsWith('P_')) return 1; // Pipe
+    if (pipeSizeStr.startsWith('T _') || pipeSizeStr.startsWith('T_')) return 2; // Trench
+    if (pipeSizeStr.startsWith('R _') || pipeSizeStr.startsWith('R_')) return 3; // Reducer
+    return 4; // Mistakes / No Prefix
 }
 
 function sortPipes(a, b) {
-    const scoreA = getPipeSortScore(a);
-    const scoreB = getPipeSortScore(b);
+    const typeA = getPipeTypeScore(a);
+    const typeB = getPipeTypeScore(b);
+    if (typeA !== typeB) return typeA - typeB;
     
-    if (scoreA !== scoreB) return scoreA - scoreB;
+    // Extract numbers: e.g. "P_489*500*20" -> [489, 500, 20]
+    const numsA = [...a.matchAll(/\d+(\.\d+)?/g)].map(m => parseFloat(m[0]));
+    const numsB = [...b.matchAll(/\d+(\.\d+)?/g)].map(m => parseFloat(m[0]));
+    
+    // 1. Diameter: Largest first (Descending)
+    const d1A = numsA[0] || 0, d1B = numsB[0] || 0;
+    if (d1A !== d1B) return d1B - d1A; 
+    
+    // 2. Length: Smallest first (Ascending)
+    const d2A = numsA[1] || 0, d2B = numsB[1] || 0;
+    if (d2A !== d2B) return d2A - d2B; 
+    
+    // 3. Thickness: Largest first (Descending)
+    const d3A = numsA[2] || 0, d3B = numsB[2] || 0;
+    if (d3A !== d3B) return d3B - d3A; 
+    
     return a.localeCompare(b);
 }
 
