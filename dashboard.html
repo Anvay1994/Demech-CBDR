@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>🏭</text></svg>">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
     <script
-        src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+        src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js" defer></script>
 </head>
 
 <body>
@@ -20,7 +20,7 @@
         <!-- ========== TOP NAV ========== -->
         <nav class="top-nav">
             <div class="nav-brand">
-                <img src="Logo _ DEMECH New[2].png" alt="Demech" class="nav-logo">
+                <img src="Logo _ DEMECH New[2].png" alt="Demech" class="nav-logo" width="134" height="48">
                 <div>
                     <h2>CBDR</h2>
                     <span class="subtitle">Centrifugal Cast Basalt Pipe Production — Report Portal</span>
@@ -60,18 +60,18 @@
         </div>
 
         <!-- ========== FILTERS BAR ========== -->
-        <div class="main-content">
+        <main class="main-content">
             <div class="filters-bar">
                 <div class="filter-group" id="filterGroupDateFrom">
-                    <label>Date From</label>
+                    <label for="filterDateFrom">Date From</label>
                     <input type="date" id="filterDateFrom" onchange="applyFilters()">
                 </div>
                 <div class="filter-group" id="filterGroupDateTo">
-                    <label>Date To</label>
+                    <label for="filterDateTo">Date To</label>
                     <input type="date" id="filterDateTo" onchange="applyFilters()">
                 </div>
                 <div class="filter-group" id="filterGroupShift">
-                    <label>Shift</label>
+                    <label for="filterShift">Shift</label>
                     <select id="filterShift" onchange="applyFilters()">
                         <option value="all">All Shifts</option>
                         <option value="I">Shift I</option>
@@ -80,25 +80,25 @@
                     </select>
                 </div>
                 <div class="filter-group" id="filterGroupSupervisor">
-                    <label>Prod Supervisor</label>
+                    <label for="filterSupervisor">Prod Supervisor</label>
                     <select id="filterSupervisor" onchange="applyFilters()">
                         <option value="all">All Supervisors</option>
                     </select>
                 </div>
                 <div class="filter-group" id="filterGroupQCName">
-                    <label>QC Supervisor</label>
+                    <label for="filterQCName">QC Supervisor</label>
                     <select id="filterQCName" onchange="applyFilters()">
                         <option value="all">All Supervisors</option>
                     </select>
                 </div>
                 <div class="filter-group" id="filterGroupPipeSize">
-                    <label>Pipe Size</label>
+                    <label for="filterPipeSize">Pipe Size</label>
                     <select id="filterPipeSize" onchange="applyFilters()">
                         <option value="all">All Sizes</option>
                     </select>
                 </div>
                 <div class="filter-group" id="filterGroupTrolley">
-                    <label>Trolley No.</label>
+                    <label for="filterTrolley">Trolley No.</label>
                     <select id="filterTrolley" onchange="applyFilters()">
                         <option value="all">All Trolleys</option>
                     </select>
@@ -146,19 +146,19 @@
                 <!-- Charts -->
                 <div class="charts-grid">
                     <div class="chart-card">
-                        <h4 id="chartAccRejTitle">📊 Accepted vs Rejected (Daily)</h4>
+                        <h3 id="chartAccRejTitle">📊 Accepted vs Rejected (Daily)</h3>
                         <div style="height: 360px; position:relative;">
                             <canvas id="chartAccRej"></canvas>
                         </div>
                     </div>
                     <div class="chart-card">
-                        <h4>🔴 Defect Type Breakdown</h4>
+                        <h3>🔴 Defect Type Breakdown</h3>
                         <div style="height: 340px; position:relative;">
                             <canvas id="chartDefects"></canvas>
                         </div>
                     </div>
                     <div class="chart-card" style="grid-column: 1 / -1;">
-                        <h4>👷 Supervisor Performance Comparison</h4>
+                        <h3>👷 Supervisor Performance Comparison</h3>
                         <div style="height: 360px; position:relative;">
                             <canvas id="chartSupervisor"></canvas>
                         </div>
@@ -182,7 +182,7 @@
                 <!-- Date Picker + Sub Tabs -->
                 <div class="daily-controls">
                     <div class="daily-date-picker">
-                        <label>Select Date</label>
+                        <label for="dailyDatePicker">Select Date</label>
                         <input type="date" id="dailyDatePicker" onchange="renderDailyReport()">
                     </div>
                     <div class="daily-sub-tabs">
@@ -364,70 +364,7 @@
                 </div>
             </div>
 
-            <!-- ===================================================
-           SECTION: DATA QUALITY
-           =================================================== -->
-            <div id="section-dataquality" class="page-section">
 
-                <div class="section-header">
-                    <h3>⚠ Data Quality Report</h3>
-                    <div style="display: flex; gap: 0.75rem; align-items: center;">
-                        <span class="badge" id="dqReportCount">—</span>
-                        <button class="btn btn-secondary btn-sm" onclick="restoreAllFlags()"
-                            title="Restore all dismissed issues">↺ Restore Dismissed</button>
-                    </div>
-                </div>
-
-                <!-- DQ KPI Cards -->
-                <div class="kpi-grid dq-kpi-grid">
-                    <div class="kpi-card red">
-                        <div class="kpi-label">Errors</div>
-                        <div class="kpi-value" id="dqErrors">0</div>
-                        <div class="kpi-sub">critical issues</div>
-                    </div>
-                    <div class="kpi-card amber">
-                        <div class="kpi-label">Warnings</div>
-                        <div class="kpi-value" id="dqWarnings">0</div>
-                        <div class="kpi-sub">needs review</div>
-                    </div>
-                    <div class="kpi-card green">
-                        <div class="kpi-label">Records Checked</div>
-                        <div class="kpi-value" id="dqChecked">0</div>
-                        <div class="kpi-sub">total rows scanned</div>
-                    </div>
-                    <div class="kpi-card blue">
-                        <div class="kpi-label">Data Health</div>
-                        <div class="kpi-value" id="dqHealth">—</div>
-                        <div class="kpi-sub">overall quality score</div>
-                    </div>
-                </div>
-
-                <!-- Error Flags Table -->
-                <div class="table-container">
-                    <div class="table-title">Detected Issues</div>
-                    <div class="report-table-wrapper">
-                        <table class="report-table dq-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:60px;">#</th>
-                                    <th style="width:90px;">Severity</th>
-                                    <th style="width:160px;">Type</th>
-                                    <th>Details</th>
-                                    <th style="width:120px;">Date</th>
-                                    <th style="width:140px;">Affected</th>
-                                    <th style="width:140px; text-align:center;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dqReportBody">
-                                <tr>
-                                    <td colspan="7" class="loading-text" style="text-align:center; padding:2rem;">
-                                        Running checks...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
             
             <!-- ===================================================
            SECTION: SUMMARIES (Monthly / Yearly)
@@ -451,11 +388,11 @@
                     </div>
 
                     <div class="daily-date-picker" id="summaryMonthPicker">
-                        <label>Select Month</label>
+                        <label for="summaryMonth">Select Month</label>
                         <input type="month" id="summaryMonth" class="date-input" onchange="renderSummaryReport()">
                     </div>
                     <div class="daily-date-picker" id="summaryYearPicker" style="display:none;">
-                        <label>Select Year</label>
+                        <label for="summaryYear">Select Year</label>
                         <select id="summaryYear" class="date-input" style="width:140px;" onchange="renderSummaryReport()">
                             <option value="24-25">FY 2024-25</option>
                             <option value="25-26">FY 2025-26</option>
@@ -517,7 +454,7 @@
 
             </div>
 
-        </div><!-- end .main-content -->
+        </main><!-- end .main-content -->
     </div><!-- end .app-container -->
 
     <script src="app.js?v=8"></script>
