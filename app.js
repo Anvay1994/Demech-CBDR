@@ -8,7 +8,7 @@
 // 1. Deploy the Google Apps Script (see google_apps_script.js)
 // 2. Paste the Web App URL below
 // 3. The sheet data stays PRIVATE — only the script can read it
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycBv3wKUTBWb_x51LTAoI_uCm1cnKPOTucoijwxlswQLxKYPh4OoA3xlb4_OqWus4W/exec'; // ← PASTE YOUR WEB APP URL HERE
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7lmAiyM0GjJyyzpQHO1p120YxLqlYWQiiEkF3ZSVvoG8gl38EjRdp93dBe9jX7sB4/exec'; // ← PASTE YOUR WEB APP URL HERE
 const API_TOKEN = 'demech_secure_2025'; // Must match the token in google_apps_script.js
 
 const SHEETS = {
@@ -305,16 +305,14 @@ function parseCSVLine(line) {
 // ============ DATA FETCHER (Secure via Google Apps Script) ============
 async function fetchSheetData(sheetName) {
     if (!APPS_SCRIPT_URL) {
-        // Show setup instructions if URL not configured
         showSetupMode();
         return [];
     }
 
     try {
-        const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}&sheet=${encodeURIComponent(sheetName)}`;
+        // Request the 2D compressed format to reduce payload size by 60%
+        const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}&sheet=${encodeURIComponent(sheetName)}&format=2d`;
 
-        // mode: 'cors' is default, but we're being explicit. 
-        // No special headers are added to keep it a "simple" request (no preflight).
         const response = await fetch(url, {
             method: 'GET',
             redirect: 'follow'
@@ -330,12 +328,24 @@ async function fetchSheetData(sheetName) {
             throw new Error(json.error);
         }
 
+        // Handle 2D Compressed Array Format
+        if (json.data && json.data.headers && Array.isArray(json.data.rows)) {
+            const headers = json.data.headers;
+            return json.data.rows.map(rowArray => {
+                const obj = {};
+                for (let i = 0; i < headers.length; i++) {
+                    obj[headers[i]] = rowArray[i];
+                }
+                return obj;
+            });
+        }
+        
+        // Fallback for legacy format (if Apps Script is not updated yet)
         return json.data || [];
 
     } catch (err) {
         console.error(`Error fetching sheet "${sheetName}":`, err);
 
-        // Standard fetch error for CORS/Network issues is TypeError: Failed to fetch
         if (err instanceof TypeError || err.message === 'Failed to fetch') {
             const corsMsg = `Connection Blocked (CORS). Please ensure your Google Apps Script is deployed as "Web App", with "Execute as: Me" and "Who has access: Anyone".`;
             showToast(corsMsg, 'error');

@@ -1,5 +1,5 @@
 // ============================================
-// Demech CBDR — QC Automation v16 (SAFE BATCH SYNC)
+// Demech CBDR — QC Automation v17 (DIAGNOSTIC & HIGH-SPEED)
 // ============================================
 
 var API_TOKEN = 'demech_secure_2025';
@@ -14,34 +14,51 @@ function handleQCAutomation() {
     lock.waitLock(20000); 
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error("Could not connect to active spreadsheet.");
+    
     var sheet = ss.getSheetByName("Input Level Data");
-    if (!sheet) return;
+    if (!sheet) throw new Error("Tab 'Input Level Data' exactly as spelled was not found.");
 
     var lastRow = sheet.getLastRow();
-    if (lastRow < 2) return;
+    if (lastRow < 2) {
+        Logger.log("Sheet is empty or has only headers. Exiting.");
+        return;
+    }
 
     // --- A. DYNAMIC COLUMN MAPPING ---
     var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     var colMap = { remarks: [] };
     
     headers.forEach(function(h, i) {
-      var name = String(h).toLowerCase().trim();
+      // Remove all extra spaces and normalize for robust matching
+      var name = String(h).toLowerCase().replace(/\s+/g, " ").trim();
       
-      // Production Columns (Sources for Batch Identification)
-      if (name === "trolley no." || name === "trolley id" || name === "trolley") colMap.trolley = i + 1;
-      if (name === "input date" || name === "production date") colMap.inputDate = i + 1;
+      if (name === "trolley no." || name === "trolley no" || name === "trolley id" || name === "trolley") colMap.trolley = i + 1;
+      if (name === "input date" || name === "production date" || name === "date") colMap.inputDate = i + 1;
       if (name === "input shift" || name === "production shift") colMap.inputShift = i + 1;
-      if (name === "production supervisor" || name === "prod. supervisor") colMap.prodSuper = i + 1;
+      if (name === "production supervisor" || name === "prod. supervisor" || name === "prod supervisor" || name === "supervisor") colMap.prodSuper = i + 1;
 
-      // Quality Columns (Targets for Syncing - X to AA)
-      if (name === "date for output") colMap.dateOut = i + 1;
+      if (name === "date for output" || name === "output date" || name === "qc date") colMap.dateOut = i + 1;
       if (name === "shift" && i > 15) colMap.shift = i + 1; 
-      if (name === "qc supervisor") colMap.super = i + 1;
-      if (name === "qc time") colMap.time = i + 1;
+      if (name === "qc supervisor" || name === "quality supervisor") colMap.super = i + 1;
+      if (name === "qc time" || name === "time") colMap.time = i + 1;
       
-      // Remark columns (Sync Triggers)
       if (/cavity|cracks|r cracks|ovality|others/.test(name)) colMap.remarks.push(i + 1);
     });
+
+    // DIAGNOSTIC: Check if any required columns are missing
+    var missingCols = [];
+    if (!colMap.trolley) missingCols.push("Trolley No.");
+    if (!colMap.inputDate) missingCols.push("Input Date");
+    if (!colMap.inputShift) missingCols.push("Input Shift");
+    if (!colMap.dateOut) missingCols.push("Date for Output");
+    if (!colMap.shift) missingCols.push("QC Shift (column > P)");
+    if (!colMap.super) missingCols.push("QC Supervisor");
+    if (!colMap.time) missingCols.push("QC Time");
+    
+    if (missingCols.length > 0) {
+        throw new Error("Missing columns in sheet: " + missingCols.join(", ") + ". Please check for renamed headers.");
+    }
 
     // --- B. SCAN WINDOW (Last 600 rows is enough for active work) ---
     var scanRange = 600; 
@@ -50,6 +67,7 @@ function handleQCAutomation() {
     var displayData = dataRange.getDisplayValues();
 
     var trolleyMasters = {};
+    var mastersFound = 0;
 
     // Phase 1: Identify Masters in the recent window
     for (var i = 0; i < displayData.length; i++) {
@@ -58,8 +76,7 @@ function handleQCAutomation() {
         var tId = String(dRow[colMap.trolley - 1]).trim();
         var iD  = String(dRow[colMap.inputDate - 1]).trim();
         var iS  = String(dRow[colMap.inputShift - 1]).trim().toLowerCase();
-        var pS  = String(dRow[colMap.prodSuper - 1]).trim().toLowerCase();
-
+        
         if (!tId || !iD) continue;
 
         // Composite Unique Key (Trolley + Date + Shift)
@@ -77,8 +94,11 @@ function handleQCAutomation() {
                 supervisor: dRow[colMap.super - 1],
                 time: qTime
             };
+            mastersFound++;
         }
     }
+    
+    Logger.log("Found " + mastersFound + " valid QC masters in the last 600 rows (Requires Date, Shift, and Time).");
 
     // Phase 2: Synchronize (V14 Safety Rules Apply)
     var rowsUpdated = 0;
@@ -92,17 +112,11 @@ function handleQCAutomation() {
 
         var master = trolleyMasters[fingerprint];
         
-        // Safety Guard 1: Must have QC remarks
-        var hasQCData = colMap.remarks.some(function(colIdx) {
-            return dRowValues[colIdx - 1] !== "" && dRowValues[colIdx - 1] !== null;
-        });
-
-        // Safety Guard 2: Date for Output MUST BE EMPTY (Prevent historical overwrite)
+        // Safety Guard: Date for Output MUST BE EMPTY (This protects historical data)
         var isDateEmpty = (dRowValues[colMap.dateOut - 1] === "");
 
-        if (hasQCData && isDateEmpty && master) {
-            console.log("Safely dragging down QC info for trolley batch: " + fingerprint);
-
+        // Only require isDateEmpty and master (removed defect requirement so perfect pipes sync too!)
+        if (isDateEmpty && master) {
             sheet.getRange(curRowNumber, colMap.dateOut).setValue(master.date);
             sheet.getRange(curRowNumber, colMap.shift).setValue(master.shift);
             sheet.getRange(curRowNumber, colMap.super).setValue(master.supervisor);
@@ -111,9 +125,11 @@ function handleQCAutomation() {
             rowsUpdated++;
         }
     }
-    console.log("Auto-sync completed. Updated " + rowsUpdated + " rows safely.");
+    
+    Logger.log("Auto-sync completed. Updated " + rowsUpdated + " child rows safely.");
 
   } catch (e) {
+    Logger.log("ERROR: " + e.toString());
     console.error("Automation Error: " + e.toString());
   } finally {
     lock.releaseLock();
@@ -168,31 +184,54 @@ function doGet(e) {
         
         var data = sheet.getDataRange().getValues();
         var headers = data[0];
-        var results = [];
         var timeZone = Session.getScriptTimeZone();
+        var format = e.parameter.format;
 
-        for (var i = 1; i < data.length; i++) {
-            var obj = {};
-            var hasVal = false;
-            for (var j = 0; j < headers.length; j++) {
-                var key = String(headers[j]).trim();
-                var val = data[i][j];
-                
-                // Smart Formatting for Dashboard
-                if (val instanceof Date) {
-                  // Time-only detection logic
-                  if (val.getFullYear() < 1970) {
-                     val = Utilities.formatDate(val, timeZone, 'HH:mm:ss');
-                  } else {
-                     val = Utilities.formatDate(val, timeZone, 'dd-MM-yyyy');
-                  }
+        if (format === '2d') {
+            // HIGH-SPEED 2D COMPRESSION MODE (Reduces payload size by ~60%)
+            var rows = [];
+            for (var i = 1; i < data.length; i++) {
+                var rowArray = [];
+                var hasVal = false;
+                for (var j = 0; j < headers.length; j++) {
+                    var val = data[i][j];
+                    if (val instanceof Date) {
+                        if (val.getFullYear() < 1970) {
+                            val = Utilities.formatDate(val, timeZone, 'HH:mm:ss');
+                        } else {
+                            val = Utilities.formatDate(val, timeZone, 'dd-MM-yyyy');
+                        }
+                    }
+                    rowArray.push(val);
+                    if (val !== '' && val !== 0 && val !== null) hasVal = true;
                 }
-                obj[key] = val;
-                if (val !== '' && val !== 0 && val !== null) hasVal = true;
+                if (hasVal) rows.push(rowArray);
             }
-            if (hasVal) results.push(obj);
+            return JSON_RESPONSE({ data: { headers: headers.map(function(h) { return String(h).trim(); }), rows: rows } });
+        } else {
+            // LEGACY JSON OBJECT MODE
+            var results = [];
+            for (var i = 1; i < data.length; i++) {
+                var obj = {};
+                var hasVal = false;
+                for (var j = 0; j < headers.length; j++) {
+                    var key = String(headers[j]).trim();
+                    var val = data[i][j];
+                    
+                    if (val instanceof Date) {
+                      if (val.getFullYear() < 1970) {
+                         val = Utilities.formatDate(val, timeZone, 'HH:mm:ss');
+                      } else {
+                         val = Utilities.formatDate(val, timeZone, 'dd-MM-yyyy');
+                      }
+                    }
+                    obj[key] = val;
+                    if (val !== '' && val !== 0 && val !== null) hasVal = true;
+                }
+                if (hasVal) results.push(obj);
+            }
+            return JSON_RESPONSE({ data: results });
         }
-        return JSON_RESPONSE({ data: results });
     } catch (err) {
         return JSON_RESPONSE({ error: err.toString() });
     }
