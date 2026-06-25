@@ -3316,13 +3316,11 @@ async function initApp() {
     }
 
     try {
-        // Fetch data from Google Sheets (parallel)
-        const [rawData, rawPipeMaster, rawShiftLevel, rawDayLevel] = await Promise.all([
-            fetchSheetData(SHEETS.report),
-            fetchSheetData(SHEETS.pipeMaster).catch(() => []),
-            fetchSheetData(SHEETS.shiftLevel).catch(() => []),
-            fetchSheetData(SHEETS.dayLevel).catch(() => [])
-        ]);
+        // Fetch data from Google Sheets (sequential to avoid Apps Script concurrency locks causing 5 min hangs)
+        const rawData = await fetchSheetData(SHEETS.report);
+        const rawPipeMaster = await fetchSheetData(SHEETS.pipeMaster).catch(() => []);
+        const rawShiftLevel = await fetchSheetData(SHEETS.shiftLevel).catch(() => []);
+        const rawDayLevel = await fetchSheetData(SHEETS.dayLevel).catch(() => []);
 
         pipeMasterData = rawPipeMaster || [];
         updatePipeMasterOrder(pipeMasterData);
