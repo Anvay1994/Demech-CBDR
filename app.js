@@ -309,6 +309,23 @@ async function fetchSheetData(sheetName) {
         return [];
     }
 
+    const cacheKey = `demech_cache_${sheetName}`;
+    const cacheTimeKey = `demech_cache_time_${sheetName}`;
+    const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes cache
+
+    const now = Date.now();
+    const cachedTime = localStorage.getItem(cacheTimeKey);
+    const cachedData = localStorage.getItem(cacheKey);
+
+    // If cache is valid, return it instantly to make the UI blazing fast (0s load)
+    if (cachedData && cachedTime && (now - parseInt(cachedTime) < CACHE_DURATION_MS)) {
+        try {
+            return JSON.parse(cachedData);
+        } catch (e) {
+            console.warn('Cache corrupted, fetching fresh data...');
+        }
+    }
+
     try {
         // Request the 2D compressed format to reduce payload size by 60%
         const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}&sheet=${encodeURIComponent(sheetName)}&format=2d`;
@@ -328,23 +345,43 @@ async function fetchSheetData(sheetName) {
             throw new Error(json.error);
         }
 
+        let parsedData = [];
+
         // Handle 2D Compressed Array Format
         if (json.data && json.data.headers && Array.isArray(json.data.rows)) {
             const headers = json.data.headers;
-            return json.data.rows.map(rowArray => {
+            parsedData = json.data.rows.map(rowArray => {
                 const obj = {};
                 for (let i = 0; i < headers.length; i++) {
                     obj[headers[i]] = rowArray[i];
                 }
                 return obj;
             });
+        } else {
+            // Fallback for legacy format
+            parsedData = json.data || [];
         }
-        
-        // Fallback for legacy format (if Apps Script is not updated yet)
-        return json.data || [];
+
+        // Save fresh data to cache for next time
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(parsedData));
+            localStorage.setItem(cacheTimeKey, now.toString());
+        } catch (e) {
+            console.warn('Local storage quota exceeded, skipping cache');
+        }
+
+        return parsedData;
 
     } catch (err) {
         console.error(`Error fetching sheet "${sheetName}":`, err);
+
+        // If fetch fails but we have stale cache, use it as fallback
+        if (cachedData) {
+            try {
+                showToast(`Network error. Loading cached data...`, 'warning');
+                return JSON.parse(cachedData);
+            } catch (e) {}
+        }
 
         if (err instanceof TypeError || err.message === 'Failed to fetch') {
             const corsMsg = `Connection Blocked (CORS). Please ensure your Google Apps Script is deployed as "Web App", with "Execute as: Me" and "Who has access: Anyone".`;

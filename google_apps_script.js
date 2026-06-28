@@ -182,28 +182,22 @@ function doGet(e) {
         var sheet = ss.getSheetByName(sheetName);
         if (!sheet) return JSON_RESPONSE({ error: 'Sheet not found' });
         
-        var data = sheet.getDataRange().getValues();
+        // HIGHSPEED FIX: getDisplayValues() is exponentially faster than getValues() 
+        // because it skips Google's internal date/number object parsing and returns pure strings.
+        var data = sheet.getDataRange().getDisplayValues();
         var headers = data[0];
-        var timeZone = Session.getScriptTimeZone();
         var format = e.parameter.format;
 
         if (format === '2d') {
-            // HIGH-SPEED 2D COMPRESSION MODE (Reduces payload size by ~60%)
+            // HIGH-SPEED 2D COMPRESSION MODE
             var rows = [];
             for (var i = 1; i < data.length; i++) {
                 var rowArray = [];
                 var hasVal = false;
                 for (var j = 0; j < headers.length; j++) {
                     var val = data[i][j];
-                    if (val instanceof Date) {
-                        if (val.getFullYear() < 1970) {
-                            val = Utilities.formatDate(val, timeZone, 'HH:mm:ss');
-                        } else {
-                            val = Utilities.formatDate(val, timeZone, 'dd-MM-yyyy');
-                        }
-                    }
                     rowArray.push(val);
-                    if (val !== '' && val !== 0 && val !== null) hasVal = true;
+                    if (val !== '') hasVal = true;
                 }
                 if (hasVal) rows.push(rowArray);
             }
@@ -218,15 +212,8 @@ function doGet(e) {
                     var key = String(headers[j]).trim();
                     var val = data[i][j];
                     
-                    if (val instanceof Date) {
-                      if (val.getFullYear() < 1970) {
-                         val = Utilities.formatDate(val, timeZone, 'HH:mm:ss');
-                      } else {
-                         val = Utilities.formatDate(val, timeZone, 'dd-MM-yyyy');
-                      }
-                    }
                     obj[key] = val;
-                    if (val !== '' && val !== 0 && val !== null) hasVal = true;
+                    if (val !== '') hasVal = true;
                 }
                 if (hasVal) results.push(obj);
             }
