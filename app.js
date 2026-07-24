@@ -639,11 +639,16 @@ function parseDate(dateStr) {
         return new Date(s);
     }
 
-    // Handle DD-MM-YYYY format
+    // Handle DD-MM-YYYY format or DD-MMM-YYYY format
     const parts = s.split('-');
     if (parts.length === 3) {
         const [d, m, y] = parts;
-        return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+        const mInt = parseInt(m);
+        if (!isNaN(mInt)) {
+            // It's a number like '07'
+            return new Date(parseInt(y), mInt - 1, parseInt(d));
+        }
+        // It's a string like 'Jul', fallback to new Date()
     }
     return new Date(s);
 }
