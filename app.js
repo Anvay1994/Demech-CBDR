@@ -761,6 +761,13 @@ function getMonthKey(dateStr) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function getMonthDisplay(dateStr) {
+    const d = parseDate(dateStr);
+    if (!d || isNaN(d.getTime())) return '';
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 function getYearKey(dateStr) {
     const d = parseDate(dateStr);
     if (!d || isNaN(d.getTime())) return '';
