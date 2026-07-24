@@ -121,24 +121,24 @@
                 <!-- KPI Cards -->
                 <div class="kpi-grid">
                     <div class="kpi-card blue">
-                        <div class="kpi-label">Total Pipes Produced</div>
-                        <div class="kpi-value" id="kpiTotalPipes">—</div>
+                        <div class="kpi-label">Total Weight</div>
+                        <div class="kpi-value" id="kpiTotalWeight">—</div>
                         <div class="kpi-sub" id="kpiSubPipes">loading...</div>
                     </div>
                     <div class="kpi-card green">
-                        <div class="kpi-label">Acceptance Rate</div>
-                        <div class="kpi-value" id="kpiAcceptRate">—</div>
-                        <div class="kpi-sub">of total production</div>
+                        <div class="kpi-label">Accepted Weight</div>
+                        <div class="kpi-value" id="kpiAcceptWeight">—</div>
+                        <div class="kpi-sub" id="kpiSubAccept">of total production</div>
                     </div>
                     <div class="kpi-card red" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">
-                        <div class="kpi-label">Rejection Rate</div>
-                        <div class="kpi-value" id="kpiRejectRate">—</div>
-                        <div class="kpi-sub">by total weight in kg</div>
+                        <div class="kpi-label">Rejected Weight</div>
+                        <div class="kpi-value" id="kpiRejectWeight">—</div>
+                        <div class="kpi-sub" id="kpiSubReject">by total weight in kg</div>
                     </div>
                     <div class="kpi-card amber">
-                        <div class="kpi-label">Total Weight</div>
-                        <div class="kpi-value" id="kpiTotalWeight">—</div>
-                        <div class="kpi-sub">all pipe sizes combined</div>
+                        <div class="kpi-label">Rejection Rate</div>
+                        <div class="kpi-value" id="kpiRejectRate">—</div>
+                        <div class="kpi-sub">by total weight</div>
                     </div>
                 </div>
 
@@ -456,7 +456,7 @@
         </main><!-- end .main-content -->
     </div><!-- end .app-container -->
 
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=12"></script>
     <script>
         // Initialize the app on page load
         document.addEventListener('DOMContentLoaded', initApp);

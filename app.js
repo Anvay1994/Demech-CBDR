@@ -907,16 +907,19 @@ function renderKPIs() {
     const acceptPct = totalWtCalc > 0 ? ((totalAcceptedWt / totalWtCalc) * 100).toFixed(1) : '0.0';
     const rejectPct = totalWtCalc > 0 ? ((totalRejectedWt / totalWtCalc) * 100).toFixed(1) : '0.0';
 
-    document.getElementById('kpiTotalPipes').textContent = totalPipes.toLocaleString('en-IN');
-    document.getElementById('kpiAcceptRate').textContent = acceptPct + '%';
+    document.getElementById('kpiTotalWeight').textContent = (totalWt / 1000).toFixed(1) + 'T';
+    document.getElementById('kpiAcceptWeight').textContent = (totalAcceptedWt / 1000).toFixed(1) + 'T';
+    document.getElementById('kpiRejectWeight').textContent = (totalRejectedWt / 1000).toFixed(1) + 'T';
     document.getElementById('kpiRejectRate').textContent = rejectPct + '%';
-    document.getElementById('kpiTotalWeight').textContent = totalWt.toLocaleString('en-IN', { maximumFractionDigits: 1 }) + ' Kg';
 
     // Show date range context
     const rangeLabel = getDateRangeLabel(data);
     const uniqueDays = new Set(data.map(r => r.date)).size;
-    document.getElementById('kpiSubPipes').textContent = `${totalAccepted.toLocaleString('en-IN')} accepted / ${totalRejected.toLocaleString('en-IN')} rejected`
-        + (rangeLabel ? ` · ${uniqueDays} day${uniqueDays !== 1 ? 's' : ''} (${rangeLabel})` : '');
+    const dateStr = (rangeLabel ? ` · ${uniqueDays} day${uniqueDays !== 1 ? 's' : ''} (${rangeLabel})` : '');
+    
+    document.getElementById('kpiSubPipes').textContent = `${totalPipes.toLocaleString('en-IN')} pipes` + dateStr;
+    document.getElementById('kpiSubAccept').textContent = `${totalAccepted.toLocaleString('en-IN')} pipes accepted`;
+    document.getElementById('kpiSubReject').textContent = `${totalRejected.toLocaleString('en-IN')} pipes rejected`;
 }
 
 // ============ PRODUCTION REPORT TABLE ============
@@ -2893,24 +2896,24 @@ function renderSummaryReport() {
 
     kpiEl.innerHTML = `
         <div class="kpi-card blue">
-            <div class="kpi-label">${isQual ? 'Total Checked' : 'Total Produced'}</div>
-            <div class="kpi-value">${totalQty.toLocaleString('en-IN')}</div>
-            <div class="kpi-sub">pipes in ${periodLabel}</div>
+            <div class="kpi-label">Total Weight</div>
+            <div class="kpi-value">\${(totalWt/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">\${totalQty.toLocaleString('en-IN')} pipes</div>
         </div>
         <div class="kpi-card green">
-            <div class="kpi-label">Accepted (Nos)</div>
-            <div class="kpi-value">${totalAcc.toLocaleString('en-IN')}</div>
-            <div class="kpi-sub">quality checked</div>
+            <div class="kpi-label">Accepted Weight</div>
+            <div class="kpi-value">\${(totalAccWtChecked/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">\${totalAcc.toLocaleString('en-IN')} pipes accepted</div>
         </div>
         <div class="kpi-card red">
-            <div class="kpi-label">Rejected (Nos)</div>
-            <div class="kpi-value">${totalRej.toLocaleString('en-IN')}</div>
-            <div class="kpi-sub" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}% rejection rate</div>
+            <div class="kpi-label">Rejected Weight</div>
+            <div class="kpi-value">\${(totalRejWtChecked/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">\${totalRej.toLocaleString('en-IN')} pipes rejected</div>
         </div>
         <div class="kpi-card amber">
-            <div class="kpi-label">Weight ${isQual ? 'Checked' : 'Produced'}</div>
-            <div class="kpi-value">${(totalWt/1000).toFixed(1)}T</div>
-            <div class="kpi-sub">Total Metric Tons</div>
+            <div class="kpi-label">Rejection Rate</div>
+            <div class="kpi-value">\${rejPct}%</div>
+            <div class="kpi-sub">by total weight</div>
         </div>
     `;
 
