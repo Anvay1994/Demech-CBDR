@@ -2897,22 +2897,22 @@ function renderSummaryReport() {
     kpiEl.innerHTML = `
         <div class="kpi-card blue">
             <div class="kpi-label">Total Weight</div>
-            <div class="kpi-value">\${(totalWt/1000).toFixed(1)}T</div>
-            <div class="kpi-sub">\${totalQty.toLocaleString('en-IN')} pipes</div>
+            <div class="kpi-value">${(totalWt/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">${totalQty.toLocaleString('en-IN')} pipes</div>
         </div>
         <div class="kpi-card green">
             <div class="kpi-label">Accepted Weight</div>
-            <div class="kpi-value">\${(totalAccWtChecked/1000).toFixed(1)}T</div>
-            <div class="kpi-sub">\${totalAcc.toLocaleString('en-IN')} pipes accepted</div>
+            <div class="kpi-value">${(totalAccWtChecked/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">${totalAcc.toLocaleString('en-IN')} pipes accepted</div>
         </div>
         <div class="kpi-card red">
             <div class="kpi-label">Rejected Weight</div>
-            <div class="kpi-value">\${(totalRejWtChecked/1000).toFixed(1)}T</div>
-            <div class="kpi-sub">\${totalRej.toLocaleString('en-IN')} pipes rejected</div>
+            <div class="kpi-value">${(totalRejWtChecked/1000).toFixed(1)}T</div>
+            <div class="kpi-sub">${totalRej.toLocaleString('en-IN')} pipes rejected</div>
         </div>
         <div class="kpi-card amber">
             <div class="kpi-label">Rejection Rate</div>
-            <div class="kpi-value">\${rejPct}%</div>
+            <div class="kpi-value">${rejPct}%</div>
             <div class="kpi-sub">by total weight</div>
         </div>
     `;
