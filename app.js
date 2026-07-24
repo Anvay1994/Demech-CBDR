@@ -2902,10 +2902,12 @@ function renderSummaryReport() {
                     sortKey: parseInt(parts[2] + parts[1]), // YYYYMM
                     qty: 0, wt: 0,
                     acc: 0, rej: 0, accWt: 0, rejWt: 0,
-                    cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0
+                    cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0,
+                    dates: new Set()
                 };
             }
             const m = monthMap[monthKey];
+            m.dates.add(d);
             m.qty += r.totalPipes;
             m.wt += r.totalWt;
             
@@ -2971,32 +2973,27 @@ function renderSummaryReport() {
 
 function renderMonthLevelSummaryTable(monthMap, container, view) {
     if (!container) return;
-    const isQualView = view === 'quality';
+    const isQual = view === 'quality';
     const sortedMonths = Object.values(monthMap).sort((a,b) => a.sortKey - b.sortKey);
 
-    let html = `<div class="report-table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">
-        <table class="report-table" style="min-width: 1400px;">
-            <thead><tr>
-                <th>Month</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>`;
-                
-    if (isQualView) {
-        html += `<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>`;
-    }
-    
-    html += `</tr></thead><tbody>`;
+    let html = `<div class="report-table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">`;
 
-    sortedMonths.forEach((m) => {
-        const pTotalWt = m.accWt + m.rejWt;
-        const rp = pTotalWt > 0 ? ((m.rejWt / pTotalWt) * 100).toFixed(1) : '0.0';
-        const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
-        
-        html += `<tr>
-            <td><strong>${m.monthName}</strong></td>
-            <td>${m.qty}</td>
-            <td>${m.wt.toFixed(1)}</td>`;
+    if (isQual) {
+        html += `<table class="report-table" style="min-width: 1400px;">
+            <thead><tr>
+                <th>Month</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>
+                <th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>
+            </tr></thead><tbody>`;
+
+        sortedMonths.forEach((m) => {
+            const pTotalWt = m.accWt + m.rejWt;
+            const rp = pTotalWt > 0 ? ((m.rejWt / pTotalWt) * 100).toFixed(1) : '0.0';
+            const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
             
-        if (isQualView) {
-            html += `
+            html += `<tr>
+                <td><strong>${m.monthName}</strong></td>
+                <td>${m.qty}</td>
+                <td>${m.wt.toFixed(1)}</td>
                 <td style="color:var(--accent-green);">${m.acc}</td>
                 <td style="color:var(--accent-red);">${m.rej}</td>
                 <td style="color:var(--accent-green);">${m.accWt.toFixed(1)}</td>
@@ -3006,10 +3003,148 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
                 <td>${m.rCracks || '—'}</td>
                 <td>${m.ovality || '—'}</td>
                 <td>${m.others || '—'}</td>
-                <td><span class="status-badge ${rc}">${rp}%</span></td>`;
-        }
-        html += `</tr>`;
-    });
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+            </tr>`;
+        });
+        
+        // Grand Totals for Quality
+        const gt = {
+            qty: sortedMonths.reduce((s,m) => s + m.qty, 0),
+            wt: sortedMonths.reduce((s,m) => s + m.wt, 0),
+            acc: sortedMonths.reduce((s,m) => s + m.acc, 0),
+            rej: sortedMonths.reduce((s,m) => s + m.rej, 0),
+            accWt: sortedMonths.reduce((s,m) => s + m.accWt, 0),
+            rejWt: sortedMonths.reduce((s,m) => s + m.rejWt, 0),
+            cavity: sortedMonths.reduce((s,m) => s + (m.cavity||0), 0),
+            cracks: sortedMonths.reduce((s,m) => s + (m.cracks||0), 0),
+            rCracks: sortedMonths.reduce((s,m) => s + (m.rCracks||0), 0),
+            ovality: sortedMonths.reduce((s,m) => s + (m.ovality||0), 0),
+            others: sortedMonths.reduce((s,m) => s + (m.others||0), 0)
+        };
+        const rejPct = (gt.accWt + gt.rejWt) > 0 ? (((gt.rejWt) / (gt.accWt + gt.rejWt)) * 100).toFixed(1) : '0.0';
+
+        html += `<tr class="grand-total-row">
+            <td><strong>GRAND TOTAL</strong></td>
+            <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.wt.toFixed(1)}</strong></td>
+            <td><strong>${gt.acc.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.rej.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.accWt.toFixed(1)}</strong></td>
+            <td><strong>${gt.rejWt.toFixed(1)}</strong></td>
+            <td><strong>${gt.cavity || ''}</strong></td>
+            <td><strong>${gt.cracks || ''}</strong></td>
+            <td><strong>${gt.rCracks || ''}</strong></td>
+            <td><strong>${gt.ovality || ''}</strong></td>
+            <td><strong>${gt.others || ''}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+        </tr>`;
+
+    } else {
+        html += `<table class="report-table" style="min-width: 1600px;">
+            <thead><tr>
+                <th>Month</th><th>Shifts</th><th>Pipes (Nos)</th><th>Weight (Kg)</th>
+                <th>Acc Nos</th><th>Acc Wt</th><th>Rej Nos</th><th>Rej Wt</th><th>Rej %</th>
+                <th class="col-bl">Input (Kg)</th><th class="col-bl">Electricity</th><th class="col-bl">PNG</th>
+                <th class="col-bl">Wire Mesh</th><th class="col-bl">Tyre Oil</th><th class="col-bl">Ignite Oil</th><th class="col-bl">Labour</th>
+            </tr></thead><tbody>`;
+
+        sortedMonths.forEach((m) => {
+            const pTotalWt = m.accWt + m.rejWt;
+            const rp = pTotalWt > 0 ? ((m.rejWt / pTotalWt) * 100).toFixed(1) : '0.0';
+            const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+            
+            let shiftsActive = 0, totalBatches = 0, inputWeight = 0;
+            let cElec = 0, cPng = 0, cWMesh = 0, cTOil = 0, cIOil = 0, cLabour = 0;
+            
+            m.dates.forEach(dateStr => {
+                const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateStr);
+                shiftsActive += new Set(dayShiftData.map(r => r['Shift'])).size || 0;
+                totalBatches += dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
+                inputWeight += dayShiftData.reduce((s, r) => {
+                    const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
+                    return s + bs + l1 + l2 + rr;
+                }, 0);
+                
+                const c = getDayLevelDataForDate(dateStr) || {};
+                cElec += parseFloat(c['Electricity Consumption'] || 0);
+                cPng += parseFloat(c['PNG Consumption'] || 0);
+                cWMesh += parseFloat(c['Wire Mesh'] || 0);
+                cTOil += parseFloat(c['Tyre Oil'] || 0);
+                cIOil += parseFloat(c['Ignite Oil'] || 0);
+                cLabour += parseFloat(c['Labour Qty'] || 0);
+            });
+
+            html += `<tr>
+                <td><strong>${m.monthName}</strong></td>
+                <td>${shiftsActive}</td>
+                <td>${m.qty}</td>
+                <td>${m.wt.toFixed(1)}</td>
+                <td class="badge-accepted">${m.acc}</td>
+                <td>${m.accWt.toFixed(1)}</td>
+                <td class="badge-rejected">${m.rej}</td>
+                <td>${m.rejWt.toFixed(1)}</td>
+                <td><span class="badge-rate ${rc}">${rp}%</span></td>
+                <td class="col-bl">${inputWeight.toFixed(0)} <small>(${totalBatches} bat)</small></td>
+                <td class="col-bl">${cElec > 0 ? cElec.toFixed(0) : '—'}</td>
+                <td class="col-bl">${cPng > 0 ? cPng.toFixed(0) : '—'}</td>
+                <td class="col-bl">${cWMesh > 0 ? cWMesh.toFixed(0) : '—'}</td>
+                <td class="col-bl">${cTOil > 0 ? cTOil.toFixed(0) : '—'}</td>
+                <td class="col-bl">${cIOil > 0 ? cIOil.toFixed(0) : '—'}</td>
+                <td class="col-bl">${cLabour > 0 ? cLabour.toFixed(0) : '—'}</td>
+            </tr>`;
+        });
+        
+        // Grand Totals for Production
+        const gt = {
+            qty: 0, wt: 0, acc: 0, rej: 0, accWt: 0, rejWt: 0,
+            input: 0, batches: 0, elec: 0, png: 0, wMesh: 0, tOil: 0, iOil: 0, labour: 0
+        };
+        
+        sortedMonths.forEach(m => {
+            gt.qty += m.qty;
+            gt.wt += m.wt;
+            gt.acc += m.acc;
+            gt.rej += m.rej;
+            gt.accWt += m.accWt;
+            gt.rejWt += m.rejWt;
+            
+            m.dates.forEach(dateStr => {
+                const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateStr);
+                gt.batches += dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
+                gt.input += dayShiftData.reduce((s, r) => {
+                    const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
+                    return s + bs + l1 + l2 + rr;
+                }, 0);
+                const c = getDayLevelDataForDate(dateStr) || {};
+                gt.elec += parseFloat(c['Electricity Consumption'] || 0);
+                gt.png += parseFloat(c['PNG Consumption'] || 0);
+                gt.wMesh += parseFloat(c['Wire Mesh'] || 0);
+                gt.tOil += parseFloat(c['Tyre Oil'] || 0);
+                gt.iOil += parseFloat(c['Ignite Oil'] || 0);
+                gt.labour += parseFloat(c['Labour Qty'] || 0);
+            });
+        });
+
+        const rejPct = (gt.accWt + gt.rejWt) > 0 ? (((gt.rejWt) / (gt.accWt + gt.rejWt)) * 100).toFixed(1) : '0.0';
+
+        html += `<tr class="grand-total-row">
+            <td colspan="2" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
+            <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
+            <td><strong>${gt.wt.toFixed(0)}</strong></td>
+            <td><strong>${gt.acc}</strong></td>
+            <td><strong>${gt.accWt.toFixed(0)}</strong></td>
+            <td><strong>${gt.rej}</strong></td>
+            <td><strong>${gt.rejWt.toFixed(0)}</strong></td>
+            <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
+            <td class="col-bl"><strong>${gt.input.toFixed(0)} <small>(${gt.batches})</small></strong></td>
+            <td class="col-bl"><strong>${gt.elec.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.png.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.wMesh.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.tOil.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.iOil.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${gt.labour.toFixed(0)}</strong></td>
+        </tr>`;
+    }
 
     html += `</tbody></table></div>`;
     container.innerHTML = html;
