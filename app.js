@@ -3,6 +3,15 @@
    Live Google Sheets ↔ Report Portal
    =================================== */
 
+// ============ NUMBER FORMATTER ============
+function formatNum(num, decimals = 0) {
+    if (num === null || num === undefined || isNaN(num)) return '0';
+    return Number(num).toLocaleString('en-IN', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
 // ============ CONFIG ============
 // INSTRUCTIONS:
 // 1. Deploy the Google Apps Script (see google_apps_script.js)
