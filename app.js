@@ -3057,7 +3057,7 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
             let cElec = 0, cPng = 0, cWMesh = 0, cTOil = 0, cIOil = 0, cLabour = 0;
             
             m.dates.forEach(dateStr => {
-                const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateStr);
+                const dayShiftData = getShiftDataForFurnace().filter(r => String(r['Date'] || '').trim() === dateStr);
                 shiftsActive += new Set(dayShiftData.map(r => r['Shift'])).size || 0;
                 totalBatches += dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
                 inputWeight += dayShiftData.reduce((s, r) => {
@@ -3109,7 +3109,7 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
             gt.rejWt += m.rejWt;
             
             m.dates.forEach(dateStr => {
-                const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === dateStr);
+                const dayShiftData = getShiftDataForFurnace().filter(r => String(r['Date'] || '').trim() === dateStr);
                 gt.batches += dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
                 gt.input += dayShiftData.reduce((s, r) => {
                     const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
@@ -3300,7 +3300,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
             const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
 
             // Lookup Shift Data (for Input Weight/Batches)
-            const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === day.date);
+            const dayShiftData = getShiftDataForFurnace().filter(r => String(r['Date'] || '').trim() === day.date);
             const shiftsActive = new Set(dayShiftData.map(r => r['Shift'])).size || '—';
             const totalBatches = dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
             const inputWeight = dayShiftData.reduce((s, r) => {
@@ -3344,7 +3344,7 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
         };
         
         sortedDays.forEach(day => {
-            const dayShiftData = shiftLevelData.filter(r => String(r['Date'] || '').trim() === day.date);
+            const dayShiftData = getShiftDataForFurnace().filter(r => String(r['Date'] || '').trim() === day.date);
             gt.batches += dayShiftData.reduce((s, r) => s + (parseInt(r['Number of batch'] || r['No of Batch']) || 0), 0);
             gt.input += dayShiftData.reduce((s, r) => {
                 const bs = parseFloat(r['Input KG_BS'] || 0), l1 = parseFloat(r['Input KG_L1'] || 0), l2 = parseFloat(r['Input KG_L2'] || 0), rr = parseFloat(r['Input KG_RR'] || 0);
