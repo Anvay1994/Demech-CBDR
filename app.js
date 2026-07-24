@@ -2727,12 +2727,15 @@ function setSummaryLevel(level) {
     // Set active button (level selector buttons are in their own sub-tabs container)
     document.getElementById('btnSummaryLvlPipe').classList.toggle('active', level === 'pipe');
     document.getElementById('btnSummaryLvlDay').classList.toggle('active', level === 'day');
+    document.getElementById('btnSummaryLvlMonth')?.classList.toggle('active', level === 'month');
     
     // Toggle container visibility
     const pipeSection = document.getElementById('sectionSummaryPipe');
     const daySection = document.getElementById('sectionSummaryDay');
+    const monthSection = document.getElementById('sectionSummaryMonth');
     if (pipeSection) pipeSection.style.display = level === 'pipe' ? 'block' : 'none';
     if (daySection) daySection.style.display = level === 'day' ? 'block' : 'none';
+    if (monthSection) monthSection.style.display = level === 'month' ? 'block' : 'none';
 }
 
 /**
@@ -2824,6 +2827,8 @@ function renderSummaryReport() {
     const pipeMap = {};
     // Aggregate by Day Level
     const dayMap = {};
+    // Aggregate by Month Level
+    const monthMap = {};
 
     periodData.forEach(r => {
         // 1. Pipe-wise Aggregation
@@ -2882,6 +2887,40 @@ function renderSummaryReport() {
                 });
             }
         }
+        
+        // 3. Month-level Aggregation
+        if (d && d.includes('-')) {
+            const parts = d.split('-');
+            const monthKey = parts[1] + '-' + parts[2]; // MM-YYYY
+            
+            if (!monthMap[monthKey]) {
+                const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                const mName = monthNames[parseInt(parts[1])-1] + ' ' + parts[2];
+                monthMap[monthKey] = {
+                    monthStr: monthKey,
+                    monthName: mName,
+                    sortKey: parseInt(parts[2] + parts[1]), // YYYYMM
+                    qty: 0, wt: 0,
+                    acc: 0, rej: 0, accWt: 0, rejWt: 0,
+                    cavity: 0, cracks: 0, rCracks: 0, ovality: 0, others: 0
+                };
+            }
+            const m = monthMap[monthKey];
+            m.qty += r.totalPipes;
+            m.wt += r.totalWt;
+            
+            if (r.status === 'QC Checked') {
+                m.acc += r.accepted;
+                m.rej += r.rejected;
+                m.accWt += r.acceptedWt;
+                m.rejWt += r.rejectedWt;
+                m.cavity += (r.cavity || 0);
+                m.cracks += (r.cracks || 0);
+                m.rCracks += (r.rCracks || 0);
+                m.ovality += (r.ovality || 0);
+                m.others += (r.others || 0);
+            }
+        }
     });
 
     // Render KPIs
@@ -2925,6 +2964,55 @@ function renderSummaryReport() {
     
     // 2. Table B: Day Level
     renderDayLevelSummaryTable(dayMap, document.getElementById('summaryDayLevel'), summaryView);
+    
+    // 3. Table C: Month Level
+    renderMonthLevelSummaryTable(monthMap, document.getElementById('summaryMonthLevel'), summaryView);
+}
+
+function renderMonthLevelSummaryTable(monthMap, container, view) {
+    if (!container) return;
+    const isQualView = view === 'quality';
+    const sortedMonths = Object.values(monthMap).sort((a,b) => a.sortKey - b.sortKey);
+
+    let html = `<div class="report-table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">
+        <table class="report-table" style="min-width: 1400px;">
+            <thead><tr>
+                <th>Month</th><th>Qty (Nos)</th><th>Prod Wt (Kg)</th>`;
+                
+    if (isQualView) {
+        html += `<th>Acc Nos</th><th>Rej Nos</th><th>Acc Wt</th><th>Rej Wt</th><th>Cavity</th><th>Cracks</th><th>R Cracks</th><th>Ovality</th><th>Others</th><th>Rej %</th>`;
+    }
+    
+    html += `</tr></thead><tbody>`;
+
+    sortedMonths.forEach((m) => {
+        const pTotalWt = m.accWt + m.rejWt;
+        const rp = pTotalWt > 0 ? ((m.rejWt / pTotalWt) * 100).toFixed(1) : '0.0';
+        const rc = parseFloat(rp) > 30 ? 'danger' : parseFloat(rp) > 15 ? 'warning' : 'good';
+        
+        html += `<tr>
+            <td><strong>${m.monthName}</strong></td>
+            <td>${m.qty}</td>
+            <td>${m.wt.toFixed(1)}</td>`;
+            
+        if (isQualView) {
+            html += `
+                <td style="color:var(--accent-green);">${m.acc}</td>
+                <td style="color:var(--accent-red);">${m.rej}</td>
+                <td style="color:var(--accent-green);">${m.accWt.toFixed(1)}</td>
+                <td style="color:var(--accent-red);">${m.rejWt.toFixed(1)}</td>
+                <td>${m.cavity || '—'}</td>
+                <td>${m.cracks || '—'}</td>
+                <td>${m.rCracks || '—'}</td>
+                <td>${m.ovality || '—'}</td>
+                <td>${m.others || '—'}</td>
+                <td><span class="status-badge ${rc}">${rp}%</span></td>`;
+        }
+        html += `</tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
 }
 
 function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {

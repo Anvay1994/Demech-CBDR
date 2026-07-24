@@ -431,6 +431,7 @@
                 <div class="daily-sub-tabs" style="margin-bottom: 1.5rem; justify-content: flex-start; border-bottom: 1px solid var(--border-glass); padding-bottom: 0.5rem; gap: 1rem;">
                     <button class="daily-sub-tab active" id="btnSummaryLvlPipe" onclick="setSummaryLevel('pipe')">📊 A. Pipe-wise Summary</button>
                     <button class="daily-sub-tab" id="btnSummaryLvlDay" onclick="setSummaryLevel('day')">🗓️ B. Day-wise Timeline</button>
+                    <button class="daily-sub-tab" id="btnSummaryLvlMonth" onclick="setSummaryLevel('month')">🗓️ C. Month-wise Timeline</button>
                 </div>
 
                 <!-- Main Content (Tables) -->
@@ -448,6 +449,13 @@
                         </div>
                         <div id="summaryDayLevel"></div>
                     </div>
+                    
+                    <div id="sectionSummaryMonth" style="margin-bottom: 2rem; display: none;">
+                        <div class="table-title" style="margin-bottom: 1rem; color: var(--text-primary); font-family: Outfit; font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            🗓️ C. Month-wise Performance Timeline
+                        </div>
+                        <div id="summaryMonthLevel"></div>
+                    </div>
                 </div>
 
 
@@ -456,7 +464,7 @@
         </main><!-- end .main-content -->
     </div><!-- end .app-container -->
 
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
     <script>
         // Initialize the app on page load
         document.addEventListener('DOMContentLoaded', initApp);
