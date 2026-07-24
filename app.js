@@ -1540,13 +1540,13 @@ function renderDashboardMonthTimeline() {
     const sortedMonths = Object.keys(monthMap).sort().map(k => monthMap[k]);
     let gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
 
-    sortedMonths.forEachformatNum(m => {
+    sortedMonths.forEach(m => {
         gtTotalWt += m.totalWt;
         gtAccWt += m.accWt;
         gtRejWt += m.rejWt;
 
         const totalQCWt = m.accWt + m.rejWt;
-        const rejPct = totalQCWt > 0 ? (m.rejWt / totalQCWt * 100, 1) : '0.0';
+        const rejPct = totalQCWt > 0 ? ((m.rejWt / totalQCWt) * 100).toFixed(1) : '0.0';
         const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
         const tr = document.createElement('tr');
