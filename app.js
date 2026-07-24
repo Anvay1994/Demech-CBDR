@@ -632,7 +632,7 @@ function transformReportData(rawData) {
 // ============ DATE HELPERS ============
 function parseDate(dateStr) {
     if (!dateStr) return null;
-    const s = String(dateStr);
+    const s = String(dateStr).trim();
 
     // Handle YYYY-MM-DD format directly
     if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
@@ -643,12 +643,18 @@ function parseDate(dateStr) {
     const parts = s.split('-');
     if (parts.length === 3) {
         const [d, m, y] = parts;
-        const mInt = parseInt(m);
-        if (!isNaN(mInt)) {
+        let mInt = parseInt(m);
+        if (isNaN(mInt)) {
+            // It's a string like 'Jul'
+            const months = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+            mInt = months[m.toLowerCase().substring(0, 3)];
+            if (mInt !== undefined) {
+                return new Date(parseInt(y), mInt, parseInt(d));
+            }
+        } else {
             // It's a number like '07'
             return new Date(parseInt(y), mInt - 1, parseInt(d));
         }
-        // It's a string like 'Jul', fallback to new Date()
     }
     return new Date(s);
 }
