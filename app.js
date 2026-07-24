@@ -747,11 +747,11 @@ function calculateCycleTime(loadingDate, loadingTime, qcDate, qcTime) {
 
 function getRejectionTooltip(r) {
     const parts = [];
-    if (r.cavity > 0) parts.push(`Cavity: ${r.cavity}`);
-    if (r.cracks > 0) parts.push(`Cracks: ${r.cracks}`);
-    if (r.rCracks > 0) parts.push(`R Cracks: ${r.rCracks}`);
-    if (r.ovality > 0) parts.push(`Ovality: ${r.ovality}`);
-    if (r.others > 0) parts.push(`Others: ${r.others}`);
+    if (r.cavity > 0) parts.push(`Cavity: ${formatNum(r.cavity)}`);
+    if (r.cracks > 0) parts.push(`Cracks: ${formatNum(r.cracks)}`);
+    if (r.rCracks > 0) parts.push(`R Cracks: ${formatNum(r.rCracks)}`);
+    if (r.ovality > 0) parts.push(`Ovality: ${formatNum(r.ovality)}`);
+    if (r.others > 0) parts.push(`Others: ${formatNum(r.others)}`);
     return parts.length > 0 ? parts.join('\n') : 'No specific defect details';
 }
 
@@ -925,15 +925,15 @@ function renderKPIs() {
     const acceptPct = totalWtCalc > 0 ? ((totalAcceptedWt / totalWtCalc) * 100).toFixed(1) : '0.0';
     const rejectPct = totalWtCalc > 0 ? ((totalRejectedWt / totalWtCalc) * 100).toFixed(1) : '0.0';
 
-    document.getElementById('kpiTotalWeight').textContent = (totalWt / 1000).toFixed(1) + 'T';
-    document.getElementById('kpiAcceptWeight').textContent = (totalAcceptedWt / 1000).toFixed(1) + 'T';
-    document.getElementById('kpiRejectWeight').textContent = (totalRejectedWt / 1000).toFixed(1) + 'T';
+    document.getElementById('kpiTotalWeight').textContent = formatNum(totalWt / 1000, 1) + 'T';
+    document.getElementById('kpiAcceptWeight').textContent = formatNum(totalAcceptedWt / 1000, 1) + 'T';
+    document.getElementById('kpiRejectWeight').textContent = formatNum(totalRejectedWt / 1000, 1) + 'T';
     document.getElementById('kpiRejectRate').textContent = rejectPct + '%';
 
     // Show date range context
     const rangeLabel = getDateRangeLabel(data);
     const uniqueDays = new Set(data.map(r => r.date)).size;
-    const dateStr = (rangeLabel ? ` · ${uniqueDays} day${uniqueDays !== 1 ? 's' : ''} (${rangeLabel})` : '');
+    const dateStr = (rangeLabel ? ` · ${formatNum(uniqueDays)} day${uniqueDays !== 1 ? 's' : ''} (${rangeLabel})` : '');
     
     document.getElementById('kpiSubPipes').textContent = `${totalPipes.toLocaleString('en-IN')} pipes` + dateStr;
     document.getElementById('kpiSubAccept').textContent = `${totalAccepted.toLocaleString('en-IN')} pipes accepted`;
@@ -1012,18 +1012,18 @@ function renderProductionReport() {
             tr.innerHTML = `
         <td>${idx === 0 ? srNo : ''}</td>
         <td class="col-bl">${pipe.prodRej}</td>
-        <td class="col-bl">${pipe.prodRejWt.toFixed(1)}</td>
+        <td class="col-bl">${formatNum(pipe.prodRejWt, 1)}</td>
         <td>${idx === 0 ? formatDate(group.date) : ''}</td>
         <td>${idx === 0 ? group.shift : ''}</td>
         <td>${idx === 0 ? group.supervisor : ''}</td>
         <td>${pipe.pipeSize}</td>
         <td>${pipe.trolleyNo}</td>
-        <td>${pipe.totalPipes}</td>
-        <td class="badge-accepted">${pipe.accepted}</td>
-        <td class="badge-rejected">${pipe.rejected}</td>
-        <td>${totalWt.toFixed(1)}</td>
-        <td>${acceptedWt.toFixed(1)}</td>
-        <td>${rejectedWt.toFixed(1)}</td>
+        <td>${formatNum(pipe.totalPipes)}</td>
+        <td class="badge-accepted">${formatNum(pipe.accepted)}</td>
+        <td class="badge-rejected">${formatNum(pipe.rejected)}</td>
+        <td>${formatNum(totalWt, 1)}</td>
+        <td>${formatNum(acceptedWt, 1)}</td>
+        <td>${formatNum(rejectedWt, 1)}</td>
         <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${pipe.rejectedPct}</span></td>
       `;
             tbody.appendChild(tr);
@@ -1037,15 +1037,15 @@ function renderProductionReport() {
         stRow.innerHTML = `
         <td></td>
         <td class="col-bl"><strong>${stProdRej}</strong></td>
-        <td class="col-bl"><strong>${stProdRejWt.toFixed(1)}</strong></td>
+        <td class="col-bl"><strong>${formatNum(stProdRejWt, 1)}</strong></td>
         <td colspan="4"></td>
         <td style="text-align:right;"><strong>Subtotal</strong></td>
         <td><strong>${stQty}</strong></td>
         <td><strong>${stAcc}</strong></td>
         <td><strong>${stRej}</strong></td>
-        <td><strong>${stTotalWt.toFixed(1)}</strong></td>
-        <td><strong>${stAccWt.toFixed(1)}</strong></td>
-        <td><strong>${stRejWt.toFixed(1)}</strong></td>
+        <td><strong>${formatNum(stTotalWt, 1)}</strong></td>
+        <td><strong>${formatNum(stAccWt, 1)}</strong></td>
+        <td><strong>${formatNum(stRejWt, 1)}</strong></td>
         <td><strong><span class="badge-rate ${stRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${stRejPct}%</span></strong></td>
       `;
         tbody.appendChild(stRow);
@@ -1074,15 +1074,15 @@ function renderProductionReport() {
     gtRow.innerHTML = `
         <td></td>
         <td class="col-bl"><strong>${gtProdRej}</strong></td>
-        <td class="col-bl"><strong>${gtProdRejWt.toFixed(1)}</strong></td>
+        <td class="col-bl"><strong>${formatNum(gtProdRejWt, 1)}</strong></td>
         <td colspan="4"></td>
         <td style="text-align:right;"><strong>Grand Total</strong></td>
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong>${gtRej}</strong></td>
-        <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
-        <td><strong>${gtAccWt.toFixed(1)}</strong></td>
-        <td><strong>${gtRejWt.toFixed(1)}</strong></td>
+        <td><strong>${formatNum(gtTotalWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtAccWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtRejWt, 1)}</strong></td>
         <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${gtRejPct}%</span></strong></td>
       `;
     tbody.appendChild(gtRow);
@@ -1139,12 +1139,12 @@ function renderProductionSummary() {
             <td>${srNo++}</td>
             <td><strong>${group.shift}</strong></td>
             <td><strong>${group.supervisor}</strong></td>
-            <td>${group.totalPipes}</td>
-            <td>${group.accepted}</td>
-            <td>${group.rejected}</td>
-            <td>${group.totalWt.toFixed(1)}</td>
-            <td>${group.acceptedWt.toFixed(1)}</td>
-            <td>${group.rejectedWt.toFixed(1)}</td>
+            <td>${formatNum(group.totalPipes)}</td>
+            <td>${formatNum(group.accepted)}</td>
+            <td>${formatNum(group.rejected)}</td>
+            <td>${formatNum(group.totalWt, 1)}</td>
+            <td>${formatNum(group.acceptedWt, 1)}</td>
+            <td>${formatNum(group.rejectedWt, 1)}</td>
             <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></td>
         `;
         tbody.appendChild(tr);
@@ -1282,12 +1282,12 @@ function renderQualityReport() {
                 <td>${pipe.pipeSize}</td>
                 <td>${pipe.trolleyNo}</td>
                 ${showTimeline ? '<td></td><td></td><td></td><td></td>' : ''}
-                <td>${pipe.totalPipes}</td>
-                <td class="badge-accepted">${pipe.accepted}</td>
-                <td class="badge-rejected" data-tooltip="${getRejectionTooltip(pipe)}">${pipe.rejected}</td>
-                <td>${totalWt.toFixed(1)}</td>
-                <td>${acceptedWt.toFixed(1)}</td>
-                <td>${rejectedWt.toFixed(1)}</td>
+                <td>${formatNum(pipe.totalPipes)}</td>
+                <td class="badge-accepted">${formatNum(pipe.accepted)}</td>
+                <td class="badge-rejected" data-tooltip="${getRejectionTooltip(pipe)}">${formatNum(pipe.rejected)}</td>
+                <td>${formatNum(totalWt, 1)}</td>
+                <td>${formatNum(acceptedWt, 1)}</td>
+                <td>${formatNum(rejectedWt, 1)}</td>
                 <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${pipe.rejectedPct}</span></td>
             `;
             tbody.appendChild(tr);
@@ -1309,9 +1309,9 @@ function renderQualityReport() {
             <td><strong>${stQty}</strong></td>
             <td><strong>${stAcc}</strong></td>
             <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(stDefects)}">${stRej}</strong></td>
-            <td><strong>${stTotalWt.toFixed(1)}</strong></td>
-            <td><strong>${stAccWt.toFixed(1)}</strong></td>
-            <td><strong>${stRejWt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(stTotalWt, 1)}</strong></td>
+            <td><strong>${formatNum(stAccWt, 1)}</strong></td>
+            <td><strong>${formatNum(stRejWt, 1)}</strong></td>
             <td><strong><span class="badge-rate ${stRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${stRejPct}%</span></strong></td>
         `;
         tbody.appendChild(stRow);
@@ -1329,9 +1329,9 @@ function renderQualityReport() {
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${gtRej}</strong></td>
-        <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
-        <td><strong>${gtAccWt.toFixed(1)}</strong></td>
-        <td><strong>${gtRejWt.toFixed(1)}</strong></td>
+        <td><strong>${formatNum(gtTotalWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtAccWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtRejWt, 1)}</strong></td>
         <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${gtRejPct}%</span></strong></td>
     `;
     tbody.appendChild(gtRow);
@@ -1420,12 +1420,12 @@ function renderQualitySummary() {
       <td>${srNo}</td>
       <td style="text-align:center;"><span class="badge-shift sh-${group.shift}">${group.shift}</span></td>
       <td><strong>${group.qcName}</strong></td>
-      <td>${group.totalPipes}</td>
-      <td>${group.accepted}</td>
-      <td><span class="badge-rejected" data-tooltip="${getRejectionTooltip(group)}">${group.rejected}</span></td>
-      <td>${group.totalWt.toFixed(1)}</td>
-      <td>${group.acceptedWt.toFixed(1)}</td>
-      <td>${group.rejectedWt.toFixed(1)}</td>
+      <td>${formatNum(group.totalPipes)}</td>
+      <td>${formatNum(group.accepted)}</td>
+      <td><span class="badge-rejected" data-tooltip="${getRejectionTooltip(group)}">${formatNum(group.rejected)}</span></td>
+      <td>${formatNum(group.totalWt, 1)}</td>
+      <td>${formatNum(group.acceptedWt, 1)}</td>
+      <td>${formatNum(group.rejectedWt, 1)}</td>
       <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rejPct}%</span></td>
     `;
         tbody.appendChild(tr);
@@ -1444,9 +1444,9 @@ function renderQualitySummary() {
         <td><strong>${gtQty}</strong></td>
         <td><strong>${gtAcc}</strong></td>
         <td><strong class="badge-rejected" data-tooltip="${getRejectionTooltip(gtDefects)}">${gtRej}</strong></td>
-        <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
-        <td><strong>${gtAccWt.toFixed(1)}</strong></td>
-        <td><strong>${gtRejWt.toFixed(1)}</strong></td>
+        <td><strong>${formatNum(gtTotalWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtAccWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtRejWt, 1)}</strong></td>
         <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated on Weight (Kg.)">${gtRejPct}%</span></strong></td>
     `;
     tbody.appendChild(gtRow);
@@ -1531,21 +1531,21 @@ function renderDashboardMonthTimeline() {
     const sortedMonths = Object.keys(monthMap).sort().map(k => monthMap[k]);
     let gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
 
-    sortedMonths.forEach(m => {
+    sortedMonths.forEachformatNum(m => {
         gtTotalWt += m.totalWt;
         gtAccWt += m.accWt;
         gtRejWt += m.rejWt;
 
         const totalQCWt = m.accWt + m.rejWt;
-        const rejPct = totalQCWt > 0 ? (m.rejWt / totalQCWt * 100).toFixed(1) : '0.0';
+        const rejPct = totalQCWt > 0 ? (m.rejWt / totalQCWt * 100, 1) : '0.0';
         const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${m.display}</strong></td>
-            <td>${m.totalWt.toFixed(1)}</td>
-            <td>${m.accWt.toFixed(1)}</td>
-            <td>${m.rejWt.toFixed(1)}</td>
+            <td>${formatNum(m.totalWt, 1)}</td>
+            <td>${formatNum(m.accWt, 1)}</td>
+            <td>${formatNum(m.rejWt, 1)}</td>
             <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total QC Wt) * 100">${rejPct}%</span></td>
         `;
         tbody.appendChild(tr);
@@ -1553,16 +1553,16 @@ function renderDashboardMonthTimeline() {
 
     // Grand total
     const gtTotalQCWt = gtAccWt + gtRejWt;
-    const gtRejPct = gtTotalQCWt > 0 ? (gtRejWt / gtTotalQCWt * 100).toFixed(1) : '0.0';
+    const gtRejPct = gtTotalQCWt > 0 ? formatNum(gtRejWt / gtTotalQCWt * 100, 1) : '0.0';
     const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
 
     const gtRow = document.createElement('tr');
     gtRow.classList.add('grand-total-row');
     gtRow.innerHTML = `
         <td style="text-align:right;"><strong>GRAND TOTAL</strong></td>
-        <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
-        <td><strong>${gtAccWt.toFixed(1)}</strong></td>
-        <td><strong>${gtRejWt.toFixed(1)}</strong></td>
+        <td><strong>${formatNum(gtTotalWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtAccWt, 1)}</strong></td>
+        <td><strong>${formatNum(gtRejWt, 1)}</strong></td>
         <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated as: (Rej Wt / Total QC Wt) * 100">${gtRejPct}%</span></strong></td>
     `;
     tbody.appendChild(gtRow);
@@ -1845,7 +1845,7 @@ function renderDefectsChart() {
                 const endX = isRight ? elbowX + 30 : elbowX - 30;
 
                 smallLabels.push({
-                    text: `${value} (${pct.toFixed(1)}%)`,
+                    text: `${value} (${formatNum(pct, 1)}%)`,
                     color: DEFECT_COLORS[i]?.border || '#e0e0f0',
                     edgeX, edgeY, elbowX, elbowY, endX,
                     naturalY: elbowY, y: elbowY, isRight
@@ -2301,7 +2301,7 @@ function renderDailyProduction(dateInfo, container) {
                 </div>
                 <div class="shift-card-meta">
                     <div>Pipes: <strong>${totalQty}</strong></div>
-                    <div>Weight: <strong>${totalWt.toFixed(1)} Kg</strong></div>
+                    <div>Weight: <strong>${formatNum(totalWt, 1)} Kg</strong></div>
                     ${qcChecked > 0 ? `<div style="color:var(--accent-green);">✓ QC: <strong>${qcChecked}</strong></div>` : ''}
                     ${insideTunnel > 0 ? `<div style="color:var(--accent-amber);">⏳ Tunnel: <strong>${insideTunnel}</strong></div>` : ''}
                 </div>
@@ -2318,21 +2318,21 @@ function renderDailyProduction(dateInfo, container) {
             
             pipeRows.forEach((p, idx) => {
                 const totalWtValue = p.accWt + p.rejWt;
-                const rejPct = totalWtValue > 0 ? (p.rejWt / totalWtValue * 100).toFixed(1) : '0';
+                const rejPct = totalWtValue > 0 ? formatNum(p.rejWt / totalWtValue * 100, 1) : '0';
                 const showRemark = p.hasPending && (p.acc + p.rej === 0);
                 
                 html += `<tr>
                     <td>${idx+1}</td>
                     <td>${p.pipeSize}</td>
                     <td>${p.wtPerPipe}</td>
-                    <td>${p.qty}</td>
-                    <td>${p.totalWt.toFixed(1)}</td>
+                    <td>${formatNum(p.qty)}</td>
+                    <td>${formatNum(p.totalWt, 1)}</td>
                     ${showQC ? `
                         <td style="font-size: 0.75rem;">${showRemark ? '<span class="status-badge progress">Yet to be checked</span>' : (p.hasPending ? '<span class="status-badge progress">Partial</span>' : '<span class="status-badge done">✓ Checked</span>')}</td>
                         <td>${showRemark ? '—' : p.acc}</td>
                         <td class="badge-rejected">${showRemark ? '—' : p.rej}</td>
-                        <td>${showRemark ? '—' : p.accWt.toFixed(1)}</td>
-                        <td>${showRemark ? '—' : p.rejWt.toFixed(1)}</td>
+                        <td>${formatNum(showRemark ? '—' : p.accWt, 1)}</td>
+                        <td>${formatNum(showRemark ? '—' : p.rejWt, 1)}</td>
                         <td>${showRemark ? '—' : (p.cavity || '')}</td>
                         <td>${showRemark ? '—' : (p.cracks || '')}</td>
                         <td>${showRemark ? '—' : (p.rCracks || '')}</td>
@@ -2348,18 +2348,18 @@ function renderDailyProduction(dateInfo, container) {
             const totalAccWt = pipeRows.reduce((s, p) => s + p.accWt, 0);
             const totalRejWt = pipeRows.reduce((s, p) => s + p.rejWt, 0);
             const totalWtSum = totalAccWt + totalRejWt;
-            const totalRejPct = totalWtSum > 0 ? (totalRejWt / totalWtSum * 100).toFixed(1) : '0';
+            const totalRejPct = totalWtSum > 0 ? formatNum(totalRejWt / totalWtSum * 100, 1) : '0';
 
             html += `<tr class="subtotal-row">
                 <td colspan="3" style="text-align:right;"><strong>Shift Total</strong></td>
                 <td><strong>${totalQty}</strong></td>
-                <td><strong>${totalWt.toFixed(1)}</strong></td>
+                <td><strong>${formatNum(totalWt, 1)}</strong></td>
                 ${showQC ? `
                     <td></td>
                     <td><strong>${totalAcc}</strong></td>
                     <td><strong>${totalRej}</strong></td>
-                    <td><strong>${totalAccWt.toFixed(1)}</strong></td>
-                    <td><strong>${totalRejWt.toFixed(1)}</strong></td>
+                    <td><strong>${formatNum(totalAccWt, 1)}</strong></td>
+                    <td><strong>${formatNum(totalRejWt, 1)}</strong></td>
                     <td colspan="5"></td>
                     <td><strong><span data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${totalRejPct}%</span></strong></td>
                 ` : ''}
@@ -2501,8 +2501,8 @@ function renderDailyQuality(dateInfo, container) {
             const ldStr = [...p.loadDates].join(', ');
             html += `<tr>
                 <td>${idx+1}</td><td>${p.pipeSize}</td><td>${ldStr}</td><td>${p.total}</td>
-                <td class="badge-accepted">${p.acc}</td><td class="badge-rejected">${p.rej}</td>
-                <td>${p.totalWt.toFixed(1)}</td><td>${p.accWt.toFixed(1)}</td><td>${p.rejWt.toFixed(1)}</td>
+                <td class="badge-accepted">${formatNum(p.acc)}</td><td class="badge-rejected">${formatNum(p.rej)}</td>
+                <td>${formatNum(p.totalWt, 1)}</td><td>${formatNum(p.accWt, 1)}</td><td>${formatNum(p.rejWt, 1)}</td>
                 <td>${p.cavity || ''}</td><td>${p.cracks || ''}</td><td>${p.rCracks || ''}</td>
                 <td>${p.ovality || ''}</td><td>${p.others || ''}</td>
                 <td><span class="badge-rate ${rc}" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100">${rp}%</span></td>
@@ -2515,7 +2515,7 @@ function renderDailyQuality(dateInfo, container) {
         html += `<tr class="subtotal-row">
             <td colspan="3" style="text-align:right;"><strong>Shift Total</strong></td>
             <td><strong>${totalQty}</strong></td><td><strong>${totalAcc}</strong></td><td><strong>${totalRej}</strong></td>
-            <td><strong>${sTotalWt.toFixed(1)}</strong></td><td><strong>${sAccWt.toFixed(1)}</strong></td><td><strong>${sRejWt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(sTotalWt, 1)}</strong></td><td><strong>${formatNum(sAccWt, 1)}</strong></td><td><strong>${formatNum(sRejWt, 1)}</strong></td>
             <td><strong>${totalCavity || ''}</strong></td><td><strong>${totalCracks || ''}</strong></td>
             <td><strong>${totalRCracks || ''}</strong></td><td><strong>${totalOvality || ''}</strong></td>
             <td><strong>${totalOthers || ''}</strong></td>
@@ -2588,7 +2588,7 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
 
     pipeRows.forEach((p, idx) => {
         const totalWtValue = p.accWt + p.rejWt;
-        const rejPct = totalWtValue > 0 ? (p.rejWt / totalWtValue * 100).toFixed(1) : '0.0';
+        const rejPct = totalWtValue > 0 ? formatNum(p.rejWt / totalWtValue * 100, 1) : '0.0';
         const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
 
         html += `
@@ -2597,12 +2597,12 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
                 <td style="color: var(--text-primary); font-weight: 500;">${p.pipeSize}</td>
                 <td>${p.unitWt}</td>
                 <td>${p.totalQty}</td>
-                <td>${p.totalWt.toFixed(1)}</td>
+                <td>${formatNum(p.totalWt, 1)}</td>
                 ${showQCColumns ? `
-                    <td class="badge-accepted">${p.acc}</td>
-                    <td class="badge-rejected">${p.rej}</td>
-                    <td>${p.accWt.toFixed(1)}</td>
-                    <td>${p.rejWt.toFixed(1)}</td>
+                    <td class="badge-accepted">${formatNum(p.acc)}</td>
+                    <td class="badge-rejected">${formatNum(p.rej)}</td>
+                    <td>${formatNum(p.accWt, 1)}</td>
+                    <td>${formatNum(p.rejWt, 1)}</td>
                     <td>${p.cavity || '—'}</td>
                     <td>${p.cracks || '—'}</td>
                     <td>${p.rCracks || '—'}</td>
@@ -2634,12 +2634,12 @@ function renderDailyPipeSummary(dayData, container, mode = 'production', showQC 
                         <tr class="subtotal-row">
                             <td colspan="3" style="text-align:right;"><strong>Daily Total</strong></td>
                             <td><strong>${grandQty}</strong></td>
-                            <td><strong>${grandWt.toFixed(1)}</strong></td>
+                            <td><strong>${formatNum(grandWt, 1)}</strong></td>
                             ${showQCColumns ? `
                                 <td><strong>${grandAcc}</strong></td>
                                 <td><strong>${grandRej}</strong></td>
-                                <td><strong>${grandAccWt.toFixed(1)}</strong></td>
-                                <td><strong>${grandRejWt.toFixed(1)}</strong></td>
+                                <td><strong>${formatNum(grandAccWt, 1)}</strong></td>
+                                <td><strong>${formatNum(grandRejWt, 1)}</strong></td>
                                 <td><strong>${grandCavity || ''}</strong></td>
                                 <td><strong>${grandCracks || ''}</strong></td>
                                 <td><strong>${grandRCracks || ''}</strong></td>
@@ -2689,8 +2689,8 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
                 <div class="daily-summary-item"><div class="ds-label">QC Specialists</div><div class="ds-value">${activeQCs}</div><div class="ds-unit">active</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Total Checked</div><div class="ds-value">${totalChecked.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Weight Checked</div><div class="ds-value">${totalCheckedWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
-                <div class="daily-summary-item" style="border-left: 1px solid var(--border-color);"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
-                <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
+                <div class="daily-summary-item" style="border-left: 1px solid var(--border-color);"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${formatNum(totalAccWt, 1)} Kg</div></div>
+                <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${formatNum(totalRejWt, 1)} Kg</div></div>
                 <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-red);"><div class="ds-label">Total Defects</div><div class="ds-value" style="color:var(--accent-red);">${totalDefects}</div><div class="ds-unit">detected</div></div>
             </div>
         </div>`;
@@ -2722,11 +2722,11 @@ function renderDaily24HrSummary(dateInfo, container, mode = 'production', showQC
         container.innerHTML += `<div class="daily-summary-card">
             <h4>📊 24-Hour Production Summary — ${formatDate(dateInfo.display)}</h4>
             <div class="daily-summary-grid">
-                <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${shiftsActive}</div><div class="ds-unit">of 3</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Shifts Active</div><div class="ds-value">${formatNum(shiftsActive)}</div><div class="ds-unit">of 3</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Total Pipes</div><div class="ds-value">${totalPipesInDay.toLocaleString('en-IN')}</div><div class="ds-unit">nos</div></div>
                 <div class="daily-summary-item"><div class="ds-label">Total Weight</div><div class="ds-value">${totalWt.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">Kg</div></div>
-                <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${totalAccWt.toFixed(1)} Kg</div></div>
-                <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${totalRejWt.toFixed(1)} Kg</div></div>
+                <div class="daily-summary-item"><div class="ds-label">Accepted</div><div class="ds-value" style="color:var(--accent-green);">${totalAcc}</div><div class="ds-unit">${formatNum(totalAccWt, 1)} Kg</div></div>
+                <div class="daily-summary-item" data-tooltip="Calculated as: (Rej Wt / Total Wt) * 100"><div class="ds-label">Rejected</div><div class="ds-value" style="color:var(--accent-red);">${totalRej} (${rejPct}%)</div><div class="ds-unit">${formatNum(totalRejWt, 1)} Kg</div></div>
                 <div class="daily-summary-item" style="border-left: 2px dashed var(--accent-amber);"><div class="ds-label">Input Furnace</div><div class="ds-value" style="color:var(--accent-amber);">${totalInputKg.toLocaleString('en-IN', {maximumFractionDigits:1})}</div><div class="ds-unit">${totalBatches ? totalBatches + ' batches' : 'Total Kg'}</div></div>
             </div>
 
@@ -2796,9 +2796,9 @@ function exportMonthlyCSV() {
         const totalWtQC = dayAccWt + dayRejWt;
         const rejPct = totalWtQC > 0 ? ((dayRejWt / totalWtQC) * 100).toFixed(1) + '%' : '';
 
-        csv += [dateStr, byShift['I'].pipes || '', (byShift['I'].wt || 0).toFixed(1),
-            byShift['II'].pipes || '', (byShift['II'].wt || 0).toFixed(1),
-            byShift['III'].pipes || '', (byShift['III'].wt || 0).toFixed(1),
+        csv += [dateStr, byShift['I'].pipes || '', formatNum(byShift['I'].wt || 0, 1),
+            byShift['II'].pipes || '', formatNum(byShift['II'].wt || 0, 1),
+            byShift['III'].pipes || '', formatNum(byShift['III'].wt || 0, 1),
             dayPipes || '', dayWt ? dayWt.toFixed(1) : '', dayAcc || '', dayRej || '', rejPct
         ].map(csvSafe).join(',') + '\r\n';
     }
@@ -3061,17 +3061,17 @@ function renderSummaryReport() {
     kpiEl.innerHTML = `
         <div class="kpi-card blue">
             <div class="kpi-label">Total Weight</div>
-            <div class="kpi-value">${(totalWt/1000).toFixed(1)}T</div>
+            <div class="kpi-value">${formatNum((totalWt/1000), 1)}T</div>
             <div class="kpi-sub">${totalQty.toLocaleString('en-IN')} pipes</div>
         </div>
         <div class="kpi-card green">
             <div class="kpi-label">Accepted Weight</div>
-            <div class="kpi-value">${(totalAccWtChecked/1000).toFixed(1)}T</div>
+            <div class="kpi-value">${formatNum((totalAccWtChecked/1000), 1)}T</div>
             <div class="kpi-sub">${totalAcc.toLocaleString('en-IN')} pipes accepted</div>
         </div>
         <div class="kpi-card red">
             <div class="kpi-label">Rejected Weight</div>
-            <div class="kpi-value">${(totalRejWtChecked/1000).toFixed(1)}T</div>
+            <div class="kpi-value">${formatNum((totalRejWtChecked/1000), 1)}T</div>
             <div class="kpi-sub">${totalRej.toLocaleString('en-IN')} pipes rejected</div>
         </div>
         <div class="kpi-card amber">
@@ -3115,12 +3115,12 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
             
             html += `<tr>
                 <td><strong>${m.monthName}</strong></td>
-                <td>${m.qty}</td>
-                <td>${m.wt.toFixed(1)}</td>
-                <td style="color:var(--accent-green);">${m.acc}</td>
-                <td style="color:var(--accent-red);">${m.rej}</td>
-                <td style="color:var(--accent-green);">${m.accWt.toFixed(1)}</td>
-                <td style="color:var(--accent-red);">${m.rejWt.toFixed(1)}</td>
+                <td>${formatNum(m.qty)}</td>
+                <td>${formatNum(m.wt, 1)}</td>
+                <td style="color:var(--accent-green);">${formatNum(m.acc)}</td>
+                <td style="color:var(--accent-red);">${formatNum(m.rej)}</td>
+                <td style="color:var(--accent-green);">${formatNum(m.accWt, 1)}</td>
+                <td style="color:var(--accent-red);">${formatNum(m.rejWt, 1)}</td>
                 <td>${m.cavity || '—'}</td>
                 <td>${m.cracks || '—'}</td>
                 <td>${m.rCracks || '—'}</td>
@@ -3149,11 +3149,11 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
         html += `<tr class="grand-total-row">
             <td><strong>GRAND TOTAL</strong></td>
             <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.wt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(gt.wt, 1)}</strong></td>
             <td><strong>${gt.acc.toLocaleString('en-IN')}</strong></td>
             <td><strong>${gt.rej.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.accWt.toFixed(1)}</strong></td>
-            <td><strong>${gt.rejWt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(gt.accWt, 1)}</strong></td>
+            <td><strong>${formatNum(gt.rejWt, 1)}</strong></td>
             <td><strong>${gt.cavity || ''}</strong></td>
             <td><strong>${gt.cracks || ''}</strong></td>
             <td><strong>${gt.rCracks || ''}</strong></td>
@@ -3199,21 +3199,21 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
 
             html += `<tr>
                 <td><strong>${m.monthName}</strong></td>
-                <td>${shiftsActive}</td>
-                <td>${m.qty}</td>
-                <td>${m.wt.toFixed(1)}</td>
-                <td class="badge-accepted">${m.acc}</td>
-                <td>${m.accWt.toFixed(1)}</td>
-                <td class="badge-rejected">${m.rej}</td>
-                <td>${m.rejWt.toFixed(1)}</td>
+                <td>${formatNum(shiftsActive)}</td>
+                <td>${formatNum(m.qty)}</td>
+                <td>${formatNum(m.wt, 1)}</td>
+                <td class="badge-accepted">${formatNum(m.acc)}</td>
+                <td>${formatNum(m.accWt, 1)}</td>
+                <td class="badge-rejected">${formatNum(m.rej)}</td>
+                <td>${formatNum(m.rejWt, 1)}</td>
                 <td><span class="badge-rate ${rc}">${rp}%</span></td>
-                <td class="col-bl">${inputWeight.toFixed(0)} <small>(${totalBatches} bat)</small></td>
-                <td class="col-bl">${cElec > 0 ? cElec.toFixed(0) : '—'}</td>
-                <td class="col-bl">${cPng > 0 ? cPng.toFixed(0) : '—'}</td>
-                <td class="col-bl">${cWMesh > 0 ? cWMesh.toFixed(0) : '—'}</td>
-                <td class="col-bl">${cTOil > 0 ? cTOil.toFixed(0) : '—'}</td>
-                <td class="col-bl">${cIOil > 0 ? cIOil.toFixed(0) : '—'}</td>
-                <td class="col-bl">${cLabour > 0 ? cLabour.toFixed(0) : '—'}</td>
+                <td class="col-bl">${formatNum(inputWeight, 0)} <small>(${totalBatches} bat)</small></td>
+                <td class="col-bl">${cElec > 0 ? formatNum(cElec, 0) : '—'}</td>
+                <td class="col-bl">${cPng > 0 ? formatNum(cPng, 0) : '—'}</td>
+                <td class="col-bl">${cWMesh > 0 ? formatNum(cWMesh, 0) : '—'}</td>
+                <td class="col-bl">${cTOil > 0 ? formatNum(cTOil, 0) : '—'}</td>
+                <td class="col-bl">${cIOil > 0 ? formatNum(cIOil, 0) : '—'}</td>
+                <td class="col-bl">${cLabour > 0 ? formatNum(cLabour, 0) : '—'}</td>
             </tr>`;
         });
         
@@ -3253,19 +3253,19 @@ function renderMonthLevelSummaryTable(monthMap, container, view) {
         html += `<tr class="grand-total-row">
             <td colspan="2" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
             <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.wt.toFixed(0)}</strong></td>
-            <td><strong>${gt.acc}</strong></td>
-            <td><strong>${gt.accWt.toFixed(0)}</strong></td>
-            <td><strong>${gt.rej}</strong></td>
-            <td><strong>${gt.rejWt.toFixed(0)}</strong></td>
+            <td><strong>${formatNum(gt.wt, 0)}</strong></td>
+            <td><strong>${formatNum(gt.acc)}</strong></td>
+            <td><strong>${formatNum(gt.accWt, 0)}</strong></td>
+            <td><strong>${formatNum(gt.rej)}</strong></td>
+            <td><strong>${formatNum(gt.rejWt, 0)}</strong></td>
             <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
-            <td class="col-bl"><strong>${gt.input.toFixed(0)} <small>(${gt.batches})</small></strong></td>
-            <td class="col-bl"><strong>${gt.elec.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.png.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.wMesh.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.tOil.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.iOil.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.labour.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.input, 0)} <small>(${gt.batches})</small></strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.elec, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.png, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.wMesh, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.tOil, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.iOil, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.labour, 0)}</strong></td>
         </tr>`;
     }
 
@@ -3295,13 +3295,13 @@ function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
             <td>${idx + 1}</td>
             <td><strong>${p.pipeSize}</strong></td>
             <td>${p.unitWt}</td>
-            <td>${p.qty}</td>
-            <td>${p.wt.toFixed(1)}</td>
+            <td>${formatNum(p.qty)}</td>
+            <td>${formatNum(p.wt, 1)}</td>
             ${displayQC ? `
-                <td class="badge-accepted">${p.acc}</td>
-                <td class="badge-rejected" data-tooltip="${getRejectionTooltip(p)}">${p.rej}</td>
-                <td>${p.accWt.toFixed(1)}</td>
-                <td>${p.rejWt.toFixed(1)}</td>
+                <td class="badge-accepted">${formatNum(p.acc)}</td>
+                <td class="badge-rejected" data-tooltip="${getRejectionTooltip(p)}">${formatNum(p.rej)}</td>
+                <td>${formatNum(p.accWt, 1)}</td>
+                <td>${formatNum(p.rejWt, 1)}</td>
                 <td>${p.cavity || '—'}</td>
                 <td>${p.cracks || '—'}</td>
                 <td>${p.rCracks || '—'}</td>
@@ -3332,12 +3332,12 @@ function renderPipeWiseSummaryTable(pipeMap, container, view, showQC) {
     html += `<tr class="grand-total-row">
         <td colspan="3" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
         <td><strong>${totalQty.toLocaleString('en-IN')}</strong></td>
-        <td><strong>${totalWt.toFixed(1)}</strong></td>
+        <td><strong>${formatNum(totalWt, 1)}</strong></td>
         ${displayQC ? `
             <td><strong>${totalAcc.toLocaleString('en-IN')}</strong></td>
             <td><strong>${totalRej.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${totalAccWt.toFixed(1)}</strong></td>
-            <td><strong>${totalRejWt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(totalAccWt, 1)}</strong></td>
+            <td><strong>${formatNum(totalRejWt, 1)}</strong></td>
             <td><strong>${gtDefects.cavity || ''}</strong></td>
             <td><strong>${gtDefects.cracks || ''}</strong></td>
             <td><strong>${gtDefects.rCracks || ''}</strong></td>
@@ -3373,12 +3373,12 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
             html += `<tr>
                 <td><strong>${formatDate(day.date)}</strong></td>
                 <td>${day.specialists.size} active</td>
-                <td>${day.qty}</td>
-                <td>${day.wt.toFixed(1)}</td>
-                <td class="badge-accepted">${day.acc}</td>
-                <td>${day.accWt.toFixed(1)}</td>
-                <td class="badge-rejected">${day.rej}</td>
-                <td>${day.rejWt.toFixed(1)}</td>
+                <td>${formatNum(day.qty)}</td>
+                <td>${formatNum(day.wt, 1)}</td>
+                <td class="badge-accepted">${formatNum(day.acc)}</td>
+                <td>${formatNum(day.accWt, 1)}</td>
+                <td class="badge-rejected">${formatNum(day.rej)}</td>
+                <td>${formatNum(day.rejWt, 1)}</td>
                 <td><span class="badge-rate ${rc}">${rp}%</span></td>
                 <td style="color:var(--accent-red);">${totalDefects || '—'}</td>
             </tr>`;
@@ -3399,11 +3399,11 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
         html += `<tr class="grand-total-row">
             <td colspan="2" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
             <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.wt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(gt.wt, 1)}</strong></td>
             <td><strong>${gt.acc.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.accWt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(gt.accWt, 1)}</strong></td>
             <td><strong>${gt.rej.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.rejWt.toFixed(1)}</strong></td>
+            <td><strong>${formatNum(gt.rejWt, 1)}</strong></td>
             <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
             <td><strong>${gt.defects || ''}</strong></td>
         </tr>`;
@@ -3436,15 +3436,15 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
 
             html += `<tr>
                 <td><strong>${formatDate(day.date)}</strong></td>
-                <td>${shiftsActive}</td>
-                <td>${day.qty}</td>
-                <td>${day.wt.toFixed(1)}</td>
-                <td class="badge-accepted">${day.acc}</td>
-                <td>${day.accWt.toFixed(1)}</td>
-                <td class="badge-rejected">${day.rej}</td>
-                <td>${day.rejWt.toFixed(1)}</td>
+                <td>${formatNum(shiftsActive)}</td>
+                <td>${formatNum(day.qty)}</td>
+                <td>${formatNum(day.wt, 1)}</td>
+                <td class="badge-accepted">${formatNum(day.acc)}</td>
+                <td>${formatNum(day.accWt, 1)}</td>
+                <td class="badge-rejected">${formatNum(day.rej)}</td>
+                <td>${formatNum(day.rejWt, 1)}</td>
                 <td><span class="badge-rate ${rc}">${rp}%</span></td>
-                <td class="col-bl">${inputWeight.toFixed(0)} <small>(${totalBatches} bat)</small></td>
+                <td class="col-bl">${formatNum(inputWeight, 0)} <small>(${totalBatches} bat)</small></td>
                 <td class="col-bl">${c['Electricity Consumption'] || '—'}</td>
                 <td class="col-bl">${c['PNG Consumption'] || '—'}</td>
                 <td class="col-bl">${c['Wire Mesh'] || '—'}</td>
@@ -3487,19 +3487,19 @@ function renderDayLevelSummaryTable(dayMap, container, view) {
         html += `<tr class="grand-total-row">
             <td colspan="2" style="text-align:right;"><strong>GRAND TOTAL</strong></td>
             <td><strong>${gt.qty.toLocaleString('en-IN')}</strong></td>
-            <td><strong>${gt.wt.toFixed(0)}</strong></td>
-            <td><strong>${gt.acc}</strong></td>
-            <td><strong>${gt.accWt.toFixed(0)}</strong></td>
-            <td><strong>${gt.rej}</strong></td>
-            <td><strong>${gt.rejWt.toFixed(0)}</strong></td>
+            <td><strong>${formatNum(gt.wt, 0)}</strong></td>
+            <td><strong>${formatNum(gt.acc)}</strong></td>
+            <td><strong>${formatNum(gt.accWt, 0)}</strong></td>
+            <td><strong>${formatNum(gt.rej)}</strong></td>
+            <td><strong>${formatNum(gt.rejWt, 0)}</strong></td>
             <td><strong><span class="badge-rate ${parseFloat(rejPct) > 30 ? 'danger' : 'good'}">${rejPct}%</span></strong></td>
-            <td class="col-bl"><strong>${gt.input.toFixed(0)} <small>(${gt.batches})</small></strong></td>
-            <td class="col-bl"><strong>${gt.elec.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.png.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.wMesh.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.tOil.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.iOil.toFixed(0)}</strong></td>
-            <td class="col-bl"><strong>${gt.labour.toFixed(0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.input, 0)} <small>(${gt.batches})</small></strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.elec, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.png, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.wMesh, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.tOil, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.iOil, 0)}</strong></td>
+            <td class="col-bl"><strong>${formatNum(gt.labour, 0)}</strong></td>
         </tr>`;
     }
     html += `</tbody></table></div>`;
