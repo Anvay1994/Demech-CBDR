@@ -1447,13 +1447,48 @@ function renderCharts() {
 }
 
 function renderDashboardMonthTimeline() {
-    const data = filteredData;
     const tbody = document.getElementById('dashboardMonthTimelineBody');
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (data.length === 0) {
+    const allFurnaceData = getDataForFurnace();
+    if (allFurnaceData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No data available</td></tr>';
+        return;
+    }
+
+    // Find the latest date to determine "Current FY" and "ongoing month"
+    const dates = allFurnaceData.map(r => parseDate(r.date)).filter(d => d);
+    if (dates.length === 0) return;
+    
+    const maxDate = new Date(Math.max(...dates));
+    const maxYear = maxDate.getFullYear();
+    const maxMonth = maxDate.getMonth() + 1;
+
+    let startYear, endYear;
+    if (maxMonth >= 4) {
+        startYear = maxYear;
+        endYear = maxYear + 1;
+    } else {
+        startYear = maxYear - 1;
+        endYear = maxYear;
+    }
+
+    // Filter for Current FY
+    const data = allFurnaceData.filter(row => {
+        const rowDate = parseDate(row.date);
+        if (!rowDate) return false;
+        
+        const yr = rowDate.getFullYear();
+        const mo = rowDate.getMonth() + 1;
+        
+        if (yr === startYear && mo >= 4) return true;
+        if (yr === endYear && mo <= 3) return true;
+        return false;
+    });
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No data available for Current FY</td></tr>';
         return;
     }
 
