@@ -1443,6 +1443,76 @@ function renderCharts() {
     renderAcceptRejectChart();
     renderDefectsChart();
     renderSupervisorChart();
+    renderDashboardMonthTimeline();
+}
+
+function renderDashboardMonthTimeline() {
+    const data = filteredData;
+    const tbody = document.getElementById('dashboardMonthTimelineBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No data available</td></tr>';
+        return;
+    }
+
+    const monthMap = {};
+    data.forEach(row => {
+        const monthKey = getMonthKey(row.date);
+        if (!monthMap[monthKey]) {
+            monthMap[monthKey] = {
+                display: getMonthDisplay(row.date),
+                totalWt: 0,
+                accWt: 0,
+                rejWt: 0
+            };
+        }
+        monthMap[monthKey].totalWt += row.totalWt || 0;
+        if (row.status === 'QC Checked') {
+            monthMap[monthKey].accWt += row.acceptedWt || 0;
+            monthMap[monthKey].rejWt += row.rejectedWt || 0;
+        }
+    });
+
+    const sortedMonths = Object.keys(monthMap).sort().map(k => monthMap[k]);
+    let gtTotalWt = 0, gtAccWt = 0, gtRejWt = 0;
+
+    sortedMonths.forEach(m => {
+        gtTotalWt += m.totalWt;
+        gtAccWt += m.accWt;
+        gtRejWt += m.rejWt;
+
+        const totalQCWt = m.accWt + m.rejWt;
+        const rejPct = totalQCWt > 0 ? (m.rejWt / totalQCWt * 100).toFixed(1) : '0.0';
+        const rateClass = parseFloat(rejPct) > 30 ? 'danger' : parseFloat(rejPct) > 15 ? 'warning' : 'good';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${m.display}</strong></td>
+            <td>${m.totalWt.toFixed(1)}</td>
+            <td>${m.accWt.toFixed(1)}</td>
+            <td>${m.rejWt.toFixed(1)}</td>
+            <td><span class="badge-rate ${rateClass}" data-tooltip="Calculated as: (Rej Wt / Total QC Wt) * 100">${rejPct}%</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    // Grand total
+    const gtTotalQCWt = gtAccWt + gtRejWt;
+    const gtRejPct = gtTotalQCWt > 0 ? (gtRejWt / gtTotalQCWt * 100).toFixed(1) : '0.0';
+    const gtRateClass = parseFloat(gtRejPct) > 30 ? 'danger' : parseFloat(gtRejPct) > 15 ? 'warning' : 'good';
+
+    const gtRow = document.createElement('tr');
+    gtRow.classList.add('grand-total-row');
+    gtRow.innerHTML = `
+        <td style="text-align:right;"><strong>GRAND TOTAL</strong></td>
+        <td><strong>${gtTotalWt.toFixed(1)}</strong></td>
+        <td><strong>${gtAccWt.toFixed(1)}</strong></td>
+        <td><strong>${gtRejWt.toFixed(1)}</strong></td>
+        <td><strong><span class="badge-rate ${gtRateClass}" data-tooltip="Calculated as: (Rej Wt / Total QC Wt) * 100">${gtRejPct}%</span></strong></td>
+    `;
+    tbody.appendChild(gtRow);
 }
 
 // ========= CHART UTILITIES =========

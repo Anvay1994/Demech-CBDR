@@ -162,6 +162,26 @@
                             <canvas id="chartSupervisor"></canvas>
                         </div>
                     </div>
+                    
+                    <div class="chart-card" style="grid-column: 1 / -1; margin-top: 1rem;">
+                        <h3 style="margin-bottom: 1rem;">🗓️ Month-wise Performance Timeline</h3>
+                        <div class="report-table-wrapper" style="background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px solid var(--border-glass);">
+                            <table class="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Month</th>
+                                        <th>Total Wt (Kg)</th>
+                                        <th>Acc Wt</th>
+                                        <th>Rej Wt</th>
+                                        <th>Rej %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboardMonthTimelineBody">
+                                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -464,7 +484,7 @@
         </main><!-- end .main-content -->
     </div><!-- end .app-container -->
 
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
     <script>
         // Initialize the app on page load
         document.addEventListener('DOMContentLoaded', initApp);
