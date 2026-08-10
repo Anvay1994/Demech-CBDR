@@ -42,14 +42,29 @@ let PIPE_MASTER_ORDER = [
     "P _78*400*20", "P _67*350*20", "P _53*350*20", "T _550*350*50", "T _250*350*50", "R _**"
 ];
 
+// Pure function of (raw, PIPE_MASTER_ORDER), called once per row but with
+// only a few dozen distinct inputs — so it scanned a 56-entry list ~31,000
+// times to produce ~56 distinct answers. Cleared whenever the order changes.
+let PIPE_SIZE_CACHE = new Map();
+
 function formatPipeSize(raw) {
     if (!raw) return '—';
-    if (raw.includes('_') && raw.includes('*')) return raw;
-    const formattedDims = raw.replace(/x/ig, '*');
-    const match = PIPE_MASTER_ORDER.find(p => p.includes(formattedDims));
-    if (match) return match;
-    // Missing items have NO prefix so they stand out as mistakes
-    return formattedDims;
+
+    const cached = PIPE_SIZE_CACHE.get(raw);
+    if (cached !== undefined) return cached;
+
+    let result;
+    if (raw.includes('_') && raw.includes('*')) {
+        result = raw;
+    } else {
+        const formattedDims = raw.replace(/x/ig, '*');
+        const match = PIPE_MASTER_ORDER.find(p => p.includes(formattedDims));
+        // Missing items have NO prefix so they stand out as mistakes
+        result = match ? match : formattedDims;
+    }
+
+    PIPE_SIZE_CACHE.set(raw, result);
+    return result;
 }
 
 function getPipeTypeScore(pipeSizeStr) {
@@ -113,6 +128,7 @@ function updatePipeMasterOrder(pmData) {
     });
     
     PIPE_MASTER_ORDER = newOrder;
+    PIPE_SIZE_CACHE = new Map();   // answers depend on the order that just changed
 }
 
 // ============ STATE ============
@@ -498,6 +514,54 @@ function showSetupMode() {
 // ============ DATA TRANSFORMATION ============
 
 // Parse the report data into structured objects
+/**
+ * Works out, ONCE for a given set of column headers, which columns a field
+ * could come from — in the exact order the old per-row getField() would have
+ * tried them.
+ *
+ * getField's choice depended on the header names (fixed for a whole payload)
+ * and on whether a given cell was empty (varies per row). So the candidate
+ * ORDER is constant and can be precomputed; only "first candidate with a
+ * non-empty value wins" has to happen per row.
+ *
+ * Deduplication is safe: a key with an empty value is skipped either way, and
+ * a key with a non-empty value would have won at its first appearance.
+ */
+function buildFieldCandidates(allKeys, keywords, exactFavors, excludes) {
+    excludes = excludes || [];
+    const candidates = [];
+    const seen = new Set();
+
+    // 1. Case-insensitive match from a preferred list, in order
+    for (const favor of exactFavors) {
+        const target = favor.toLowerCase().trim();
+        const match = allKeys.find(k => k.toLowerCase().trim() === target);
+        if (match !== undefined && !seen.has(match)) { candidates.push(match); seen.add(match); }
+    }
+
+    // 2. Any key containing a keyword, in key order, minus exclusions
+    for (const key of allKeys) {
+        const lowerKey = key.toLowerCase();
+        if (excludes.some(e => lowerKey.includes(e.toLowerCase()))) continue;
+        if (keywords.some(k => lowerKey.includes(k.toLowerCase()))) {
+            if (!seen.has(key)) { candidates.push(key); seen.add(key); }
+        }
+    }
+    return candidates;
+}
+
+/** First candidate column with a non-empty value, trimmed. */
+function pickField(row, candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+        const v = row[candidates[i]];
+        if (v !== undefined && v !== null) {
+            const s = String(v).trim();
+            if (s !== '') return s;
+        }
+    }
+    return '';
+}
+
 function transformReportData(rawData) {
     // (Previously logged the entire dataset here. At 30,000+ rows that is
     //  retained by devtools and costs real time whenever the console is open.)
@@ -505,6 +569,25 @@ function transformReportData(rawData) {
         console.warn("Raw data is empty or invalid!");
         return [];
     }
+
+    // Resolve every field's candidate columns once for the whole payload,
+    // instead of re-deriving them inside each of ~13 lookups on every row.
+    const allKeys = Object.keys(rawData[0]);
+    const FIELDS = {
+        totalPipes:  buildFieldCandidates(allKeys, ['prod qty', 'total pipe', 'total nos', 'total qty'], ['Prod Qty', 'Total Pipe Number', 'Total (Nos)']),
+        accepted:    buildFieldCandidates(allKeys, ['accepted pipes', 'accepted (nos)', 'accept'], ['Accepted Pipes', 'Accepted (Nos)', 'Accept (Nos)']),
+        rejected:    buildFieldCandidates(allKeys, ['rejected pipes', 'rejected (nos)', 'reject'], ['Rejected Pipes', 'Rejected (Nos)', 'Reject (Nos)']),
+        wtPerPipe:   buildFieldCandidates(allKeys, ['wt', 'wt per pipe'], ['WT', 'WT Per Pipe']),
+        totalWt:     buildFieldCandidates(allKeys, ['prod wt', 'total wt'], ['Prod wt', 'Total WT Pipes (KG)', 'Total Wt']),
+        acceptedWt:  buildFieldCandidates(allKeys, ['accepted wt', 'acc wt'], ['Accepted Wt', 'Acc. Wt (Kg.)', 'Acc Wt']),
+        rejectedWt:  buildFieldCandidates(allKeys, ['rejected wt', 'rej wt'], ['Rejected Wt', 'Rej. Wt (Kg.)', 'Rej Wt']),
+        supervisor:  buildFieldCandidates(allKeys, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor'], ['Time', 'Date', 'Shift']),
+        qcName:      buildFieldCandidates(allKeys, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'QC Name', 'Name'], ['Time', 'Date', 'Shift']),
+        trolleyNo:   buildFieldCandidates(allKeys, ['trolley'], ['Trolley no', 'Trolley No', 'Trolley No.']),
+        loadingDate: buildFieldCandidates(allKeys, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date ']),
+        loadingTime: buildFieldCandidates(allKeys, ['loading time'], ['Loading Time', 'Loading time']),
+        qcTime:      buildFieldCandidates(allKeys, ['qc time'], ['QC Time', 'QC time', 'QC Time '])
+    };
 
     const transformed = rawData.map((row, idx) => {
         const dateShift = row['Date_Shift'] || row['Date_shift'] || '';
@@ -526,41 +609,17 @@ function transformReportData(rawData) {
             }
         }
 
-        // Robust mapping: try exact match, then any key containing the keyword
-        const getField = (row, keywords, exactFavors, excludes = []) => {
-            const allKeys = Object.keys(row);
-            
-            // 1. Case-insensitive match from a preferred list
-            for (const favor of exactFavors) {
-                const match = allKeys.find(k => k.toLowerCase().trim() === favor.toLowerCase().trim());
-                if (match && row[match] !== undefined && row[match] !== null && String(row[match]).trim() !== '') {
-                    return String(row[match]).trim();
-                }
-            }
+        // --- Quantities & Weights (column candidates resolved once, above) ---
+        const totalPipes = parseInt(pickField(row, FIELDS.totalPipes)) || 0;
+        const accepted = parseInt(pickField(row, FIELDS.accepted)) || 0;
+        const rejected = parseInt(pickField(row, FIELDS.rejected)) || 0;
 
-            // 2. Try any key containing keywords (with exclusions)
-            for (const key of allKeys) {
-                const lowerKey = key.toLowerCase();
-                if (excludes.some(e => lowerKey.includes(e.toLowerCase()))) continue;
-                
-                if (keywords.some(k => lowerKey.includes(k.toLowerCase()))) {
-                    if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') return String(row[key]).trim();
-                }
-            }
-            return '';
-        };
-
-        // --- Quantities & Weights (using getField for flexible matching) ---
-        const totalPipes = parseInt(getField(row, ['prod qty', 'total pipe', 'total nos', 'total qty'], ['Prod Qty', 'Total Pipe Number', 'Total (Nos)'])) || 0;
-        const accepted = parseInt(getField(row, ['accepted pipes', 'accepted (nos)', 'accept'], ['Accepted Pipes', 'Accepted (Nos)', 'Accept (Nos)'])) || 0;
-        const rejected = parseInt(getField(row, ['rejected pipes', 'rejected (nos)', 'reject'], ['Rejected Pipes', 'Rejected (Nos)', 'Reject (Nos)'])) || 0;
-        
-        const wtPerPipe = parseFloat(getField(row, ['wt', 'wt per pipe'], ['WT', 'WT Per Pipe'])) || 0;
-        const totalWt = parseFloat(getField(row, ['prod wt', 'total wt'], ['Prod wt', 'Total WT Pipes (KG)', 'Total Wt'])) || 0;
-        const acceptedWt = parseFloat(getField(row, ['accepted wt', 'acc wt'], ['Accepted Wt', 'Acc. Wt (Kg.)', 'Acc Wt'])) || 0;
+        const wtPerPipe = parseFloat(pickField(row, FIELDS.wtPerPipe)) || 0;
+        const totalWt = parseFloat(pickField(row, FIELDS.totalWt)) || 0;
+        const acceptedWt = parseFloat(pickField(row, FIELDS.acceptedWt)) || 0;
 
         // Calculate rejected weight
-        const rawRejectedWt = getField(row, ['rejected wt', 'rej wt'], ['Rejected Wt', 'Rej. Wt (Kg.)', 'Rej Wt']);
+        const rawRejectedWt = pickField(row, FIELDS.rejectedWt);
         const rejectedWt = rawRejectedWt !== "" ? parseFloat(rawRejectedWt) : (totalWt - acceptedWt);
 
         let qcShift = '';
@@ -590,13 +649,13 @@ function transformReportData(rawData) {
         const rawDate = parseDateInput(String(row['Input Date'] || row['Date'] || '').trim());
         let rawQcDate = parseDateInput(String(row['Date for Output'] || '').trim());
 
-        const supervisor = getField(row, ['supervisor'], ['Production Supervisor', 'Production Supervisor Name', 'Supervisor'], ['Time', 'Date', 'Shift']);
-        const qcName = getField(row, ['qc', 'quality supervisor'], ['QC Supervisor', 'QC Supervisor Name', 'QC Name', 'Name'], ['Time', 'Date', 'Shift']);
-        const trolleyNo = getField(row, ['trolley'], ['Trolley no', 'Trolley No', 'Trolley No.']);
+        const supervisor = pickField(row, FIELDS.supervisor);
+        const qcName = pickField(row, FIELDS.qcName);
+        const trolleyNo = pickField(row, FIELDS.trolleyNo);
 
-        const lDateRaw = getField(row, ['loading date', 'input date'], ['Loading Date', 'Input Date', 'Input Date ']);
-        const lTimeRaw = getField(row, ['loading time'], ['Loading Time', 'Loading time']);
-        const qTimeRaw = getField(row, ['qc time'], ['QC Time', 'QC time', 'QC Time ']);
+        const lDateRaw = pickField(row, FIELDS.loadingDate);
+        const lTimeRaw = pickField(row, FIELDS.loadingTime);
+        const qTimeRaw = pickField(row, FIELDS.qcTime);
 
         return {
             sourceRows: [row['ID'] || row['Related ID'] || (idx + 2)],
@@ -731,17 +790,31 @@ function parseDate(dateStr) {
     return new Date(s);
 }
 
+// Also pure, also called once per row, also with few distinct inputs — a few
+// hundred dates at most. toLocaleDateString is comparatively expensive.
+const FORMAT_DATE_CACHE = new Map();
+
 function formatDate(dateStr) {
+    const cached = FORMAT_DATE_CACHE.get(dateStr);
+    if (cached !== undefined) return cached;
+
+    let result;
     const d = parseDate(dateStr);
-    if (!d || isNaN(d.getTime())) return dateStr;
-    // If it's the 1899 epoch (time-only), don't show it as a date
-    if (d.getFullYear() < 1920) return '';
-    
-    return d.toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-    }).replace(/ /g, '-');
+    if (!d || isNaN(d.getTime())) {
+        result = dateStr;
+    } else if (d.getFullYear() < 1920) {
+        // If it's the 1899 epoch (time-only), don't show it as a date
+        result = '';
+    } else {
+        result = d.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        }).replace(/ /g, '-');
+    }
+
+    FORMAT_DATE_CACHE.set(dateStr, result);
+    return result;
 }
 
 function formatTimeLocal(timeStr) {
