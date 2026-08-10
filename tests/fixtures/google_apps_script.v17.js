@@ -1,55 +1,12 @@
 // ============================================
-// Demech CBDR — QC Automation v18 (BUNDLED + CACHED)
-// ============================================
-//
-// WHAT CHANGED FROM v17 (read before deploying):
-//   1. handleQCAutomation is UNCHANGED — byte for byte identical to v17.
-//   2. doGet's 'verify' branch is UNCHANGED — byte for byte identical to v17.
-//   3. doGet's single-sheet branch still works exactly as before, so the
-//      currently deployed dashboard keeps running against this script.
-//   4. NEW: action=bundle returns all four data sheets in ONE request.
-//   5. NEW: CacheService layer, shared across all users. Ten people opening
-//      the dashboard at shift change now costs one sheet read, not ten.
-//   6. NEW: the 'sheet' parameter is checked against an allowlist, so the
-//      Users sheet can no longer be served over the web API.
-//
-// TOKEN ROTATION — IMPORTANT:
-//   Both the new and the old token are accepted right now, on purpose, so
-//   deploying this script does NOT break the dashboard that is currently
-//   live. Once the new frontend is deployed and confirmed working, delete
-//   the LEGACY_API_TOKEN line below and redeploy.
+// Demech CBDR — QC Automation v17 (DIAGNOSTIC & HIGH-SPEED)
 // ============================================
 
-var API_TOKEN        = 'demech_qea97pror1_2026';   // new — matches config.js
-var LEGACY_API_TOKEN = 'demech_secure_2025';       // DELETE after frontend rollout
-
-// Sheets the web API is permitted to serve. 'Users' is deliberately absent.
-var ALLOWED_SHEETS = [
-  'Input Level Data',
-  'Pipe Master',
-  'Shift Level Data',
-  'Day Level Data',
-  'Summary Sheet'
-];
-
-// Sheets returned by action=bundle, in the order the dashboard wants them.
-var BUNDLE_SHEETS = [
-  'Input Level Data',
-  'Pipe Master',
-  'Shift Level Data',
-  'Day Level Data'
-];
-
-var CACHE_PREFIX      = 'cbdr_v1_';
-var CACHE_TTL_DEFAULT = 90;   // seconds — data sheets
-var CACHE_TTL_SLOW    = 600;  // seconds — Pipe Master, which rarely changes
-var CACHE_CHUNK_SIZE  = 80000; // chars; CacheService caps a value at ~100KB
+var API_TOKEN = 'demech_secure_2025';
 
 /**
  * 1. AUTOMATION: handleQCAutomation
  * Synchronizes QC Metadata while strictly protecting historical data.
- *
- * UNCHANGED FROM v17. Do not modify — the QC team depends on this behaviour.
  */
 function handleQCAutomation() {
   var lock = LockService.getScriptLock();
@@ -185,14 +142,10 @@ function handleQCAutomation() {
  */
 function doGet(e) {
     try {
-        var t0 = Date.now();
         var action = e.parameter.action;
-        var incomingToken = e.parameter.token;
-        if (incomingToken !== API_TOKEN && incomingToken !== LEGACY_API_TOKEN) {
-            return JSON_RESPONSE({ error: 'Unauthorized' });
-        }
-
         var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var incomingToken = e.parameter.token;
+        if (incomingToken !== API_TOKEN) return JSON_RESPONSE({ error: 'Unauthorized' });
 
         // --- LOGIN VERIFICATION ---
         if (action === 'verify') {
@@ -224,54 +177,41 @@ function doGet(e) {
             return JSON_RESPONSE({ success: false });
         }
 
-        var forceFresh = (e.parameter.fresh === '1');
-
-        // --- BUNDLE MODE: all four sheets in a single request ---
-        if (action === 'bundle') {
-            var parts = [];
-            for (var b = 0; b < BUNDLE_SHEETS.length; b++) {
-                var bName = BUNDLE_SHEETS[b];
-                var bJson = getSheetJson(ss, bName, forceFresh);
-                // A missing sheet yields an empty payload, matching the old
-                // client's .catch(() => []) behaviour.
-                if (bJson === null) bJson = '{"headers":[],"rows":[]}';
-                parts.push(JSON.stringify(bName) + ':' + bJson);
-            }
-            return RAW_JSON_RESPONSE(
-                '{"data":{' + parts.join(',') + '},"ms":' + (Date.now() - t0) + '}'
-            );
-        }
-
-        // --- SINGLE-SHEET MODE (v17 compatible) ---
+        // --- DATA SERVING ---
         var sheetName = e.parameter.sheet || 'Input Level Data';
-
-        // Allowlist: the web API must never serve the Users sheet.
-        if (ALLOWED_SHEETS.indexOf(sheetName) === -1) {
-            return JSON_RESPONSE({ error: 'Sheet not found' });
-        }
-
         var sheet = ss.getSheetByName(sheetName);
         if (!sheet) return JSON_RESPONSE({ error: 'Sheet not found' });
-
+        
+        // HIGHSPEED FIX: getDisplayValues() is exponentially faster than getValues() 
+        // because it skips Google's internal date/number object parsing and returns pure strings.
+        var data = sheet.getDataRange().getDisplayValues();
+        var headers = data[0];
         var format = e.parameter.format;
 
         if (format === '2d') {
-            // HIGH-SPEED 2D COMPRESSION MODE (now served from cache when warm)
-            var sJson = getSheetJson(ss, sheetName, forceFresh);
-            if (sJson === null) return JSON_RESPONSE({ error: 'Sheet not found' });
-            return RAW_JSON_RESPONSE('{"data":' + sJson + '}');
+            // HIGH-SPEED 2D COMPRESSION MODE
+            var rows = [];
+            for (var i = 1; i < data.length; i++) {
+                var rowArray = [];
+                var hasVal = false;
+                for (var j = 0; j < headers.length; j++) {
+                    var val = data[i][j];
+                    rowArray.push(val);
+                    if (val !== '') hasVal = true;
+                }
+                if (hasVal) rows.push(rowArray);
+            }
+            return JSON_RESPONSE({ data: { headers: headers.map(function(h) { return String(h).trim(); }), rows: rows } });
         } else {
-            // LEGACY JSON OBJECT MODE (unchanged from v17)
-            var data = sheet.getDataRange().getDisplayValues();
-            var lHeaders = data[0];
+            // LEGACY JSON OBJECT MODE
             var results = [];
             for (var i = 1; i < data.length; i++) {
                 var obj = {};
                 var hasVal = false;
-                for (var j = 0; j < lHeaders.length; j++) {
-                    var key = String(lHeaders[j]).trim();
+                for (var j = 0; j < headers.length; j++) {
+                    var key = String(headers[j]).trim();
                     var val = data[i][j];
-
+                    
                     obj[key] = val;
                     if (val !== '') hasVal = true;
                 }
@@ -284,119 +224,6 @@ function doGet(e) {
     }
 }
 
-// ============================================
-// 3. SHEET SERIALISATION + CACHE
-// ============================================
-
-/**
- * Builds the 2D payload for one sheet. The row-filtering logic here is
- * identical to v17's format=2d branch, so the dashboard receives exactly
- * the same rows in exactly the same order.
- */
-function buildSheetPayload(ss, sheetName) {
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return null;
-
-    var data = sheet.getDataRange().getDisplayValues();
-    if (!data || data.length === 0) return { headers: [], rows: [] };
-
-    var headers = data[0];
-    var rows = [];
-    for (var i = 1; i < data.length; i++) {
-        var rowArray = [];
-        var hasVal = false;
-        for (var j = 0; j < headers.length; j++) {
-            var val = data[i][j];
-            rowArray.push(val);
-            if (val !== '') hasVal = true;
-        }
-        if (hasVal) rows.push(rowArray);
-    }
-
-    return {
-        headers: headers.map(function(h) { return String(h).trim(); }),
-        rows: rows
-    };
-}
-
-/**
- * Returns the serialised JSON string for a sheet, from cache when warm.
- * Returns null only when the sheet does not exist.
- */
-function getSheetJson(ss, sheetName, forceFresh) {
-    var cache = CacheService.getScriptCache();
-
-    if (!forceFresh) {
-        var hit = cacheGetChunked(cache, sheetName);
-        if (hit) return hit;
-    }
-
-    var payload = buildSheetPayload(ss, sheetName);
-    if (payload === null) return null;
-
-    var json = JSON.stringify(payload);
-    cachePutChunked(cache, sheetName, json);
-    return json;
-}
-
-function cacheKeyFor(sheetName, suffix) {
-    return CACHE_PREFIX + sheetName.replace(/\s+/g, '_') + '_' + suffix;
-}
-
-/**
- * Reassembles a chunked cache entry. Returns null on any inconsistency —
- * a partial eviction is treated as a miss, never as partial data.
- */
-function cacheGetChunked(cache, sheetName) {
-    try {
-        var metaRaw = cache.get(cacheKeyFor(sheetName, 'meta'));
-        if (!metaRaw) return null;
-
-        var meta = JSON.parse(metaRaw);
-        var keys = [];
-        for (var i = 0; i < meta.n; i++) keys.push(cacheKeyFor(sheetName, i));
-
-        var parts = cache.getAll(keys);
-        var out = '';
-        for (var k = 0; k < keys.length; k++) {
-            var piece = parts[keys[k]];
-            if (piece === null || piece === undefined) return null; // evicted
-            out += piece;
-        }
-
-        if (out.length !== meta.len) return null; // torn write or eviction
-        return out;
-    } catch (err) {
-        return null;
-    }
-}
-
-/**
- * Splits a payload across cache keys. Cache failures are swallowed —
- * caching must never be able to break a response.
- */
-function cachePutChunked(cache, sheetName, json) {
-    try {
-        var ttl = (sheetName === 'Pipe Master') ? CACHE_TTL_SLOW : CACHE_TTL_DEFAULT;
-        var n = Math.ceil(json.length / CACHE_CHUNK_SIZE) || 1;
-
-        var obj = {};
-        for (var i = 0; i < n; i++) {
-            obj[cacheKeyFor(sheetName, i)] =
-                json.substring(i * CACHE_CHUNK_SIZE, (i + 1) * CACHE_CHUNK_SIZE);
-        }
-        obj[cacheKeyFor(sheetName, 'meta')] = JSON.stringify({ n: n, len: json.length });
-
-        cache.putAll(obj, ttl);
-    } catch (err) {
-        Logger.log('Cache write skipped: ' + err.toString());
-    }
-}
-
 function JSON_RESPONSE(obj) {
     return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
-}
-
-function RAW_JSON_RESPONSE(str) {
-    return ContentService.createTextOutput(str).setMimeType(ContentService.MimeType.JSON);
 }
