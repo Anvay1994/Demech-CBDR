@@ -437,8 +437,15 @@ async function fetchBundle(forceFresh) {
     const response = await fetch(url, { method: 'GET', redirect: 'follow' });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
-    const text = await response.text();
+    let text = await response.text();
     const tFetched = performance.now();
+
+    // Take the size and signature while the raw text is still needed, so it
+    // can be released the moment parsing is done. On a plant tablet this is
+    // several megabytes that would otherwise sit in memory through the whole
+    // expand-and-render pass.
+    const bytes = text.length;
+    const sig = signatureOf(text);
 
     let json;
     try {
@@ -446,13 +453,17 @@ async function fetchBundle(forceFresh) {
     } catch (e) {
         throw new Error('Malformed response from server');
     }
+    text = null;
+
     if (json.error) throw new Error(json.error);
     if (!json.data) throw new Error('Server returned no data');
 
     perfLog('fetch bundle', t0,
-        `${(text.length / 1048576).toFixed(1)} MB, server ${json.ms} ms, parse ${Math.round(performance.now() - tFetched)} ms`);
+        `${(bytes / 1048576).toFixed(1)} MB, server ${json.ms} ms, parse ${Math.round(performance.now() - tFetched)} ms`);
 
-    return { data: json.data, sig: signatureOf(text) };
+    const data = json.data;
+    json = null;
+    return { data: data, sig: sig };
 }
 
 // Legacy per-sheet fetch. Retained as the fallback path if the deployed Apps
@@ -3979,6 +3990,7 @@ async function initApp(opts) {
             applyBundle(unpackBundle(data));
             lastBundleSig = sig;
             idbSet(CACHE_KEY, { data: data, sig: sig, ts: Date.now() });
+            data = null;   // several MB; nothing below needs it
             stampRefreshTime();
             if (!opts.background || !painted) {
                 showToast(`Loaded ${allData.length} records from Google Sheets`, 'success');
