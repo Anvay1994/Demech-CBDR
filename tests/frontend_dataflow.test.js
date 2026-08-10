@@ -204,7 +204,31 @@ console.log('\n=== 5. Background refresh is rate-limited by time, not by trigger
     vm.runInContext('REFRESH_INTERVAL_MS', ctx) === 5 * 60 * 1000);
 }
 
-console.log('\n=== 6. Nothing below transformReportData was touched ===');
+console.log('\n=== 6. Performance budget on a realistic row count ===');
+{
+  // The live sheet is ~31,000 rows. Before the column-candidates and
+  // memoisation work this took ~6,100 ms, which the browser paid on every
+  // load — and twice per load once cache-then-refresh was added.
+  const rows = [];
+  while (rows.length < 31000) {
+    for (const r of payloadV19.rows) { if (rows.length >= 31000) break; rows.push(r); }
+  }
+  const big = { headers: payloadV19.headers, rows };
+
+  let t = Date.now();
+  const objs = ctx.expandSheet(big);
+  const expandMs = Date.now() - t;
+
+  t = Date.now();
+  const out = ctx.transformReportData(objs);
+  const transformMs = Date.now() - t;
+
+  console.log(`        expandSheet ${expandMs} ms · transformReportData ${transformMs} ms · ${out.length} aggregated rows`);
+  check(`transformReportData under 3s for 31,000 rows (${transformMs} ms)`, transformMs < 3000);
+  check(`expandSheet under 2s for 31,000 rows (${expandMs} ms)`, expandMs < 2000);
+}
+
+console.log('\n=== 7. Nothing below transformReportData was touched ===');
 {
   const current = fs.readFileSync(path.join(REPO, 'app.js'), 'utf8');
   const marker = 'function transformReportData(';
