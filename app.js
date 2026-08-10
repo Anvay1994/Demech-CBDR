@@ -395,8 +395,13 @@ function expandSheet(payload) {
     return out;
 }
 
+// When the last real network fetch happened, so background refreshes can be
+// rate-limited independently of what triggers them.
+let lastFetchAt = 0;
+
 // All four sheets in one request. Returns { data, sig }.
 async function fetchBundle(forceFresh) {
+    lastFetchAt = Date.now();
     const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}` +
         `&action=bundle${forceFresh ? '&fresh=1' : ''}`;
 
@@ -938,55 +943,51 @@ function populateFilterOptions() {
     const psSelect = document.getElementById('filterPipeSize');
     const trolSelect = document.getElementById('filterTrolley');
 
-    // Rebuilding these with innerHTML resets every selection to "all". That
-    // matters now that data can refresh in the background — without this the
-    // user's filters would be silently cleared under them mid-session.
-    const previous = {
-        sup: supSelect ? supSelect.value : null,
-        qc: qcSelect ? qcSelect.value : null,
-        ps: psSelect ? psSelect.value : null,
-        trol: trolSelect ? trolSelect.value : null
-    };
+    fillSelect(supSelect, supervisors, 'All Supervisors');
+    fillSelect(qcSelect, qcSupervisors, 'All Supervisors');
+    fillSelect(psSelect, pipeSizes, 'All Sizes');
+    fillSelect(trolSelect, trolleys, 'All Trolleys');
+}
 
-    if (supSelect) {
-        supSelect.innerHTML = '<option value="all">All Supervisors</option>';
-        supervisors.forEach(s => {
-            supSelect.innerHTML += `<option value="${s}">${s}</option>`;
-        });
-    }
+/**
+ * Fills a filter dropdown, producing exactly the same markup as before.
+ *
+ * Two differences that matter now that data refreshes in the background:
+ *
+ * 1. If the option list is unchanged, the element is left completely alone.
+ *    Rebuilding it would clear whatever the user has selected — which is why
+ *    filters used to reset every 5 minutes when the auto-refresh ran.
+ * 2. The options are joined and assigned once. The previous code did
+ *    `el.innerHTML += ...` inside a loop, which re-parses the whole list on
+ *    every single iteration.
+ */
+function fillSelect(el, values, allLabel) {
+    if (!el) return;
 
-    if (qcSelect) {
-        qcSelect.innerHTML = '<option value="all">All Supervisors</option>';
-        qcSupervisors.forEach(q => {
-            qcSelect.innerHTML += `<option value="${q}">${q}</option>`;
-        });
-    }
-
-    if (psSelect) {
-        psSelect.innerHTML = '<option value="all">All Sizes</option>';
-        pipeSizes.forEach(ps => {
-            psSelect.innerHTML += `<option value="${ps}">${ps}</option>`;
-        });
-    }
-
-    if (trolSelect) {
-        trolSelect.innerHTML = '<option value="all">All Trolleys</option>';
-        trolleys.forEach(t => {
-            trolSelect.innerHTML += `<option value="${t}">${t}</option>`;
-        });
-    }
-
-    // Restore what the user had chosen, if that option still exists.
-    const restore = (el, val) => {
-        if (!el || !val || val === 'all') return;
-        for (let i = 0; i < el.options.length; i++) {
-            if (el.options[i].value === val) { el.value = val; return; }
+    // Unchanged? Then do not touch the DOM at all.
+    if (el.options.length === values.length + 1) {
+        let same = el.options[0].value === 'all';
+        for (let i = 0; same && i < values.length; i++) {
+            if (el.options[i + 1].value !== String(values[i])) same = false;
         }
-    };
-    restore(supSelect, previous.sup);
-    restore(qcSelect, previous.qc);
-    restore(psSelect, previous.ps);
-    restore(trolSelect, previous.trol);
+        if (same) return;
+    }
+
+    const keep = el.value;
+
+    const html = new Array(values.length + 1);
+    html[0] = `<option value="all">${allLabel}</option>`;
+    for (let i = 0; i < values.length; i++) {
+        html[i + 1] = `<option value="${values[i]}">${values[i]}</option>`;
+    }
+    el.innerHTML = html.join('');
+
+    // The list genuinely changed; keep the user's choice if it is still there.
+    if (keep && keep !== 'all') {
+        for (let i = 0; i < el.options.length; i++) {
+            if (el.options[i].value === keep) { el.value = keep; return; }
+        }
+    }
 }
 
 // ============ KPI RENDERING ============
@@ -3980,18 +3981,25 @@ function refreshNow() {
     return initApp({ force: true });
 }
 
-// Auto-refresh every 5 minutes, but only while the tab is actually visible.
-// A dashboard left open on a spare monitor overnight no longer re-fetches
-// several megabytes 288 times.
+// Auto-refresh cadence. Every background refresh downloads the better part of
+// a megabyte, so it is rate-limited by time-since-last-fetch rather than by
+// how often it happens to be asked. Returning to the tab therefore catches up
+// if the data is stale, and costs nothing if it is not — without this, simply
+// alt-tabbing between windows re-fetched everything each time.
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+function maybeBackgroundRefresh() {
+    if (Date.now() - lastFetchAt < REFRESH_INTERVAL_MS) return;
+    initApp({ background: true });
+}
+
 setInterval(() => {
     if (typeof document !== 'undefined' && document.hidden) return;
-    initApp({ background: true });
-}, 5 * 60 * 1000);
+    maybeBackgroundRefresh();
+}, 60 * 1000);
 
-// Catch up straight away when the user comes back to a tab that skipped its
-// scheduled refreshes.
 if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) initApp({ background: true });
+        if (!document.hidden) maybeBackgroundRefresh();
     });
 }

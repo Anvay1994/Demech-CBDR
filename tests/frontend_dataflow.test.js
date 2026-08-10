@@ -30,9 +30,12 @@ function fakeSelect() {
   return {
     _opts: [],
     value: 'all',
+    writes: 0,   // how many times the DOM was actually rebuilt
     get innerHTML() { return this._opts.map(o => `<option value="${o.value}">${o.label}</option>`).join(''); },
     set innerHTML(v) {
+      this.writes++;
       this._opts = parseOptions(v);
+      // A real <select> resets to the first option when its contents are replaced.
       if (!this._opts.some(o => o.value === this.value)) this.value = this._opts.length ? this._opts[0].value : '';
     },
     get options() { return this._opts; },
@@ -151,20 +154,57 @@ console.log('\n=== 4. Background refresh no longer wipes the user filters ===');
   selects.filterSupervisor.value = someSupervisor;
   selects.filterTrolley.value = someTrolley;
 
-  ctx.populateFilterOptions();   // simulates a background refresh
+  const writesBefore = selects.filterSupervisor.writes;
+  ctx.populateFilterOptions();   // simulates a background refresh, same data
 
   check('supervisor filter survives a refresh', selects.filterSupervisor.value === someSupervisor,
     `expected "${someSupervisor}", got "${selects.filterSupervisor.value}"`);
   check('trolley filter survives a refresh', selects.filterTrolley.value === someTrolley,
     `expected "${someTrolley}", got "${selects.filterTrolley.value}"`);
+  check('unchanged list does not touch the DOM at all',
+    selects.filterSupervisor.writes === writesBefore,
+    `${selects.filterSupervisor.writes - writesBefore} rebuild(s) happened`);
 
-  // A filter whose option has disappeared must fall back, not throw
-  selects.filterSupervisor.value = 'SOMEONE_WHO_LEFT';
+  // Now the underlying data genuinely changes: the chosen supervisor is gone.
+  vm.runInContext(`allData = __testRows.filter(r => r.supervisor !== ${JSON.stringify(someSupervisor)});`, ctx);
   ctx.populateFilterOptions();
-  check('vanished option falls back to "all"', selects.filterSupervisor.value === 'all');
+  check('list rebuilds when the data really changed', selects.filterSupervisor.writes > writesBefore);
+  check('a supervisor who no longer exists falls back to "all"',
+    selects.filterSupervisor.value === 'all', `got "${selects.filterSupervisor.value}"`);
+
+  // A different, still-present selection must survive that same rebuild
+  vm.runInContext('allData = __testRows;', ctx);
+  ctx.populateFilterOptions();
+  const stillThere = selects.filterTrolley.options.map(o => o.value).find(v => v && v !== 'all');
+  selects.filterTrolley.value = stillThere;
+  vm.runInContext(`allData = __testRows.filter(r => r.supervisor !== ${JSON.stringify(someSupervisor)});`, ctx);
+  ctx.populateFilterOptions();
+  check('unrelated filter survives a rebuild caused by other data changing',
+    selects.filterTrolley.value === stillThere, `expected "${stillThere}", got "${selects.filterTrolley.value}"`);
 }
 
-console.log('\n=== 5. Nothing below transformReportData was touched ===');
+console.log('\n=== 5. Background refresh is rate-limited by time, not by trigger ===');
+{
+  // Stand in for initApp so we can count refreshes without doing any work.
+  vm.runInContext('__refreshCalls = 0; initApp = function () { __refreshCalls++; };', ctx);
+
+  // A fetch just happened: repeated triggers (tab switching) must do nothing.
+  vm.runInContext('lastFetchAt = Date.now();', ctx);
+  for (let i = 0; i < 10; i++) ctx.maybeBackgroundRefresh();
+  check('10 tab switches right after a fetch cause 0 refreshes',
+    ctx.__refreshCalls === 0, `got ${ctx.__refreshCalls}`);
+
+  // Once the interval has genuinely elapsed, one trigger refreshes.
+  vm.runInContext('lastFetchAt = Date.now() - (REFRESH_INTERVAL_MS + 1000);', ctx);
+  ctx.maybeBackgroundRefresh();
+  check('a trigger after the interval does refresh', ctx.__refreshCalls === 1, `got ${ctx.__refreshCalls}`);
+
+  // `const` is not a property of the VM global, so read it from inside.
+  check('refresh interval is 5 minutes',
+    vm.runInContext('REFRESH_INTERVAL_MS', ctx) === 5 * 60 * 1000);
+}
+
+console.log('\n=== 6. Nothing below transformReportData was touched ===');
 {
   const current = fs.readFileSync(path.join(REPO, 'app.js'), 'utf8');
   const marker = 'function transformReportData(';
