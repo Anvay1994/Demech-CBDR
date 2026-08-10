@@ -337,6 +337,18 @@ const CACHE_DB_NAME = 'demech_cache';
 const CACHE_STORE = 'bundles';
 const CACHE_KEY = 'bundle_v1';
 
+// The old localStorage cache is replaced by IndexedDB. Its entries would
+// otherwise sit in every user's browser forever, holding a few hundred KB of
+// data nothing reads any more.
+(function dropLegacyCache() {
+    try {
+        ['Input Level Data', 'Pipe Master', 'Shift Level Data', 'Day Level Data'].forEach(name => {
+            localStorage.removeItem(`demech_cache_${name}`);
+            localStorage.removeItem(`demech_cache_time_${name}`);
+        });
+    } catch (e) { /* private browsing, disabled storage — nothing to clean */ }
+})();
+
 function idbOpen() {
     return new Promise((resolve, reject) => {
         if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
