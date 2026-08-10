@@ -34,7 +34,7 @@
                     </div>
                 </div>
                 <span class="refresh-info" id="refreshTime">Loading...</span>
-                <button class="btn btn-secondary btn-sm" onclick="initApp()" title="Refresh data">↻ Refresh</button>
+                <button class="btn btn-secondary btn-sm" onclick="refreshNow()" title="Refresh data">↻ Refresh</button>
                 <button class="btn-logout" onclick="logout()">Logout</button>
             </div>
         </nav>
@@ -484,7 +484,8 @@
         </main><!-- end .main-content -->
     </div><!-- end .app-container -->
 
-    <script src="app.js?v=24"></script>
+    <script src="config.js?v=27"></script>
+    <script src="app.js?v=27"></script>
     <script>
         // Initialize the app on page load
         document.addEventListener('DOMContentLoaded', initApp);

@@ -13,12 +13,12 @@ function formatNum(num, decimals = 0) {
 }
 
 // ============ CONFIG ============
-// INSTRUCTIONS:
-// 1. Deploy the Google Apps Script (see google_apps_script.js)
-// 2. Paste the Web App URL below
-// 3. The sheet data stays PRIVATE — only the script can read it
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7lmAiyM0GjJyyzpQHO1p120YxLqlYWQiiEkF3ZSVvoG8gl38EjRdp93dBe9jX7sB4/exec'; // ← PASTE YOUR WEB APP URL HERE
-const API_TOKEN = 'demech_secure_2025'; // Must match the token in google_apps_script.js
+// APPS_SCRIPT_URL and API_TOKEN now live in config.js, which BOTH the login
+// page and the dashboard load. index.html previously pulled all 174 KB of
+// this file just to read those two values.
+//
+// config.js must be loaded before this file. To change the endpoint or the
+// token, edit config.js — not here.
 
 const SHEETS = {
     report: 'Input Level Data',
@@ -311,95 +311,157 @@ function parseCSVLine(line) {
     return result;
 }
 
-// ============ DATA FETCHER (Secure via Google Apps Script) ============
-async function fetchSheetData(sheetName) {
-    if (!APPS_SCRIPT_URL) {
-        showSetupMode();
-        return [];
+// ============ TIMING (console only; on-screen with ?debug=1) ============
+const DEBUG_TIMING = typeof location !== 'undefined' && /[?&]debug=1/.test(location.search);
+
+function perfLog(label, startedAt, extra) {
+    const ms = Math.round(performance.now() - startedAt);
+    console.log(`[perf] ${label}: ${ms} ms${extra ? ' — ' + extra : ''}`);
+    if (!DEBUG_TIMING) return;
+    let box = document.getElementById('perfBox');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'perfBox';
+        box.style.cssText = 'position:fixed;bottom:8px;right:8px;z-index:9999;background:rgba(0,0,0,.85);' +
+            'color:#0f0;font:11px/1.5 monospace;padding:8px 10px;border-radius:6px;max-width:340px;';
+        document.body.appendChild(box);
     }
+    box.innerHTML += `${label}: <b>${ms} ms</b>${extra ? ' — ' + extra : ''}<br>`;
+}
 
-    const cacheKey = `demech_cache_${sheetName}`;
-    const cacheTimeKey = `demech_cache_time_${sheetName}`;
-    const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes cache
+// ============ LOCAL CACHE (IndexedDB) ============
+// The payload is ~5.8 MB and growing, so localStorage (~5 MB cap) cannot hold
+// it. It has been silently failing its quota for months, which is why every
+// visit re-downloaded everything. IndexedDB has no practical size limit.
+const CACHE_DB_NAME = 'demech_cache';
+const CACHE_STORE = 'bundles';
+const CACHE_KEY = 'bundle_v1';
 
-    const now = Date.now();
-    const cachedTime = localStorage.getItem(cacheTimeKey);
-    const cachedData = localStorage.getItem(cacheKey);
-
-    // If cache is valid, return it instantly to make the UI blazing fast (0s load)
-    if (cachedData && cachedTime && (now - parseInt(cachedTime) < CACHE_DURATION_MS)) {
-        try {
-            return JSON.parse(cachedData);
-        } catch (e) {
-            console.warn('Cache corrupted, fetching fresh data...');
-        }
-    }
-
+// The old localStorage cache is replaced by IndexedDB. Its entries would
+// otherwise sit in every user's browser forever, holding a few hundred KB of
+// data nothing reads any more.
+(function dropLegacyCache() {
     try {
-        // Request the 2D compressed format to reduce payload size by 60%
-        const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}&sheet=${encodeURIComponent(sheetName)}&format=2d`;
-
-        const response = await fetch(url, {
-            method: 'GET',
-            redirect: 'follow'
+        ['Input Level Data', 'Pipe Master', 'Shift Level Data', 'Day Level Data'].forEach(name => {
+            localStorage.removeItem(`demech_cache_${name}`);
+            localStorage.removeItem(`demech_cache_time_${name}`);
         });
+    } catch (e) { /* private browsing, disabled storage — nothing to clean */ }
+})();
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
+function idbOpen() {
+    return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
+        const req = indexedDB.open(CACHE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
 
-        const json = await response.json();
+// Caching must never be able to break the app: every failure resolves quietly.
+function idbGet(key) {
+    return idbOpen().then(db => new Promise((resolve) => {
+        const req = db.transaction(CACHE_STORE, 'readonly').objectStore(CACHE_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    })).catch(() => null);
+}
 
-        if (json.error) {
-            throw new Error(json.error);
-        }
+function idbSet(key, value) {
+    return idbOpen().then(db => new Promise((resolve) => {
+        const tx = db.transaction(CACHE_STORE, 'readwrite');
+        tx.objectStore(CACHE_STORE).put(value, key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+    })).catch(() => false);
+}
 
-        let parsedData = [];
+// Cheap content signature, used to skip re-rendering when nothing changed.
+// Must react to values changing inside existing rows, not just row counts —
+// the QC automation backfills existing rows without adding any.
+function signatureOf(text) {
+    let h = 5381;
+    for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+    return h.toString(36) + ':' + text.length;
+}
 
-        // Handle 2D Compressed Array Format
-        if (json.data && json.data.headers && Array.isArray(json.data.rows)) {
-            const headers = json.data.headers;
-            parsedData = json.data.rows.map(rowArray => {
-                const obj = {};
-                for (let i = 0; i < headers.length; i++) {
-                    obj[headers[i]] = rowArray[i];
-                }
-                return obj;
-            });
-        } else {
-            // Fallback for legacy format
-            parsedData = json.data || [];
-        }
+// ============ DATA FETCHER (Secure via Google Apps Script) ============
 
-        // Save fresh data to cache for next time
-        try {
-            localStorage.setItem(cacheKey, JSON.stringify(parsedData));
-            localStorage.setItem(cacheTimeKey, now.toString());
-        } catch (e) {
-            console.warn('Local storage quota exceeded, skipping cache');
-        }
-
-        return parsedData;
-
-    } catch (err) {
-        console.error(`Error fetching sheet "${sheetName}":`, err);
-
-        // If fetch fails but we have stale cache, use it as fallback
-        if (cachedData) {
-            try {
-                showToast(`Network error. Loading cached data...`, 'warning');
-                return JSON.parse(cachedData);
-            } catch (e) {}
-        }
-
-        if (err instanceof TypeError || err.message === 'Failed to fetch') {
-            const corsMsg = `Connection Blocked (CORS). Please ensure your Google Apps Script is deployed as "Web App", with "Execute as: Me" and "Who has access: Anyone".`;
-            showToast(corsMsg, 'error');
-            throw new Error(corsMsg);
-        }
-
-        throw err;
+// Turns the compact {headers, rows} payload into the row objects the rest of
+// the app expects. Byte-for-byte what the old per-sheet fetcher produced.
+function expandSheet(payload) {
+    if (!payload || !payload.headers || !Array.isArray(payload.rows)) return [];
+    const headers = payload.headers;
+    const width = headers.length;
+    const out = new Array(payload.rows.length);
+    for (let i = 0; i < payload.rows.length; i++) {
+        const arr = payload.rows[i];
+        const obj = {};
+        for (let j = 0; j < width; j++) obj[headers[j]] = arr[j];
+        out[i] = obj;
     }
+    return out;
+}
+
+// When the last real network fetch happened, so background refreshes can be
+// rate-limited independently of what triggers them.
+let lastFetchAt = 0;
+
+// All four sheets in one request. Returns { data, sig }.
+async function fetchBundle(forceFresh) {
+    lastFetchAt = Date.now();
+    const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}` +
+        `&action=bundle${forceFresh ? '&fresh=1' : ''}`;
+
+    const t0 = performance.now();
+    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+    const text = await response.text();
+    const tFetched = performance.now();
+
+    let json;
+    try {
+        json = JSON.parse(text);
+    } catch (e) {
+        throw new Error('Malformed response from server');
+    }
+    if (json.error) throw new Error(json.error);
+    if (!json.data) throw new Error('Server returned no data');
+
+    perfLog('fetch bundle', t0,
+        `${(text.length / 1048576).toFixed(1)} MB, server ${json.ms} ms, parse ${Math.round(performance.now() - tFetched)} ms`);
+
+    return { data: json.data, sig: signatureOf(text) };
+}
+
+// Legacy per-sheet fetch. Retained as the fallback path if the deployed Apps
+// Script does not yet understand action=bundle, so a half-finished rollout
+// cannot leave the dashboard blank.
+async function fetchSheetData(sheetName) {
+    const url = `${APPS_SCRIPT_URL}?token=${encodeURIComponent(API_TOKEN)}` +
+        `&sheet=${encodeURIComponent(sheetName)}&format=2d`;
+
+    const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+    const json = await response.json();
+    if (json.error) throw new Error(json.error);
+
+    if (json.data && json.data.headers && Array.isArray(json.data.rows)) return expandSheet(json.data);
+    return json.data || [];
+}
+
+async function fetchAllSheetsIndividually() {
+    const report = await fetchSheetData(SHEETS.report);
+    const pipeMaster = await fetchSheetData(SHEETS.pipeMaster).catch(() => []);
+    const shiftLevel = await fetchSheetData(SHEETS.shiftLevel).catch(() => []);
+    const dayLevel = await fetchSheetData(SHEETS.dayLevel).catch(() => []);
+    return { report, pipeMaster, shiftLevel, dayLevel };
 }
 
 function showSetupMode() {
@@ -437,7 +499,8 @@ function showSetupMode() {
 
 // Parse the report data into structured objects
 function transformReportData(rawData) {
-    console.log('Raw Data received from API:', rawData);
+    // (Previously logged the entire dataset here. At 30,000+ rows that is
+    //  retained by devtools and costs real time whenever the console is open.)
     if (!rawData || !rawData.length) {
         console.warn("Raw data is empty or invalid!");
         return [];
@@ -892,32 +955,50 @@ function populateFilterOptions() {
     const psSelect = document.getElementById('filterPipeSize');
     const trolSelect = document.getElementById('filterTrolley');
 
-    if (supSelect) {
-        supSelect.innerHTML = '<option value="all">All Supervisors</option>';
-        supervisors.forEach(s => {
-            supSelect.innerHTML += `<option value="${s}">${s}</option>`;
-        });
+    fillSelect(supSelect, supervisors, 'All Supervisors');
+    fillSelect(qcSelect, qcSupervisors, 'All Supervisors');
+    fillSelect(psSelect, pipeSizes, 'All Sizes');
+    fillSelect(trolSelect, trolleys, 'All Trolleys');
+}
+
+/**
+ * Fills a filter dropdown, producing exactly the same markup as before.
+ *
+ * Two differences that matter now that data refreshes in the background:
+ *
+ * 1. If the option list is unchanged, the element is left completely alone.
+ *    Rebuilding it would clear whatever the user has selected — which is why
+ *    filters used to reset every 5 minutes when the auto-refresh ran.
+ * 2. The options are joined and assigned once. The previous code did
+ *    `el.innerHTML += ...` inside a loop, which re-parses the whole list on
+ *    every single iteration.
+ */
+function fillSelect(el, values, allLabel) {
+    if (!el) return;
+
+    // Unchanged? Then do not touch the DOM at all.
+    if (el.options.length === values.length + 1) {
+        let same = el.options[0].value === 'all';
+        for (let i = 0; same && i < values.length; i++) {
+            if (el.options[i + 1].value !== String(values[i])) same = false;
+        }
+        if (same) return;
     }
 
-    if (qcSelect) {
-        qcSelect.innerHTML = '<option value="all">All Supervisors</option>';
-        qcSupervisors.forEach(q => {
-            qcSelect.innerHTML += `<option value="${q}">${q}</option>`;
-        });
-    }
+    const keep = el.value;
 
-    if (psSelect) {
-        psSelect.innerHTML = '<option value="all">All Sizes</option>';
-        pipeSizes.forEach(ps => {
-            psSelect.innerHTML += `<option value="${ps}">${ps}</option>`;
-        });
+    const html = new Array(values.length + 1);
+    html[0] = `<option value="all">${allLabel}</option>`;
+    for (let i = 0; i < values.length; i++) {
+        html[i + 1] = `<option value="${values[i]}">${values[i]}</option>`;
     }
+    el.innerHTML = html.join('');
 
-    if (trolSelect) {
-        trolSelect.innerHTML = '<option value="all">All Trolleys</option>';
-        trolleys.forEach(t => {
-            trolSelect.innerHTML += `<option value="${t}">${t}</option>`;
-        });
+    // The list genuinely changed; keep the user's choice if it is still there.
+    if (keep && keep !== 'all') {
+        for (let i = 0; i < el.options.length; i++) {
+            if (el.options[i].value === keep) { el.value = keep; return; }
+        }
     }
 }
 
@@ -3699,67 +3780,154 @@ function levenshtein(a, b) {
 
 
 // ============ INIT ============
-async function initApp() {
-    if (!checkAuth()) return;
+// Signature of whatever is currently on screen, so a background refresh that
+// finds nothing new does not redraw the charts and tables for no reason.
+let lastBundleSig = null;
 
-    showLoading(true);
+// Takes the four sheets, populates state, and redraws. Safe to run repeatedly:
+// setDefaultDateRange() and the summary defaults only fill blanks, and
+// populateFilterOptions() now preserves the user's selections.
+function applyBundle(sheets) {
+    const t0 = performance.now();
 
-    // Update last refresh time
+    pipeMasterData = sheets.pipeMaster || [];
+    updatePipeMasterOrder(pipeMasterData);
+    allData = transformReportData(sheets.report || []);
+    shiftLevelData = sheets.shiftLevel || [];
+    dayLevelData = sheets.dayLevel || [];
+
+    // Set default date filter: last 7 days for dashboard
+    setDefaultDateRange();
+
+    // Populate filter dropdowns
+    populateFilterOptions();
+
+    // Apply filters (will use default date range)
+    applyFilters();
+
+    // Set default month for summary
+    const summaryMonthInput = document.getElementById('summaryMonth');
+    if (summaryMonthInput && !summaryMonthInput.value) {
+        const now = new Date();
+        summaryMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    // Set default dates for custom range (Current Month)
+    const summaryStartInput = document.getElementById('summaryStartDate');
+    const summaryEndInput = document.getElementById('summaryEndDate');
+    if (summaryStartInput && summaryEndInput && !summaryStartInput.value) {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const fmt = (d) => {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        };
+        summaryStartInput.value = fmt(firstDay);
+        summaryEndInput.value = fmt(now);
+    }
+
+    perfLog('transform + render', t0, `${allData.length} rows`);
+}
+
+function unpackBundle(data) {
+    return {
+        report: expandSheet(data[SHEETS.report]),
+        pipeMaster: expandSheet(data[SHEETS.pipeMaster]),
+        shiftLevel: expandSheet(data[SHEETS.shiftLevel]),
+        dayLevel: expandSheet(data[SHEETS.dayLevel])
+    };
+}
+
+function stampRefreshTime() {
     const refreshEl = document.getElementById('refreshTime');
     if (refreshEl) {
         refreshEl.textContent = `Last refresh: ${new Date().toLocaleTimeString('en-IN')}`;
     }
+}
 
+/**
+ * opts.force      — bypass the local cache and ask the server for fresh data
+ *                   (the Refresh button; previously it could return data up
+ *                   to 10 minutes old while reporting success)
+ * opts.background — a scheduled refresh: no spinner, no toast unless
+ *                   something actually changed
+ */
+async function initApp(opts) {
+    opts = opts || {};
+    if (!checkAuth()) return;
+
+    if (typeof APPS_SCRIPT_URL === 'undefined' || !APPS_SCRIPT_URL) {
+        showSetupMode();
+        return;
+    }
+
+    let painted = false;
+
+    // 1. Paint from the local cache immediately, so the screen is never blank.
+    if (!opts.force && !opts.background) {
+        const cached = await idbGet(CACHE_KEY);
+        if (cached && cached.data) {
+            try {
+                const t0 = performance.now();
+                applyBundle(unpackBundle(cached.data));
+                lastBundleSig = cached.sig;
+                painted = true;
+                showLoading(false);
+                perfLog('painted from local cache', t0);
+            } catch (e) {
+                console.warn('Cached copy unusable, fetching fresh:', e);
+            }
+        }
+    }
+
+    if (!painted && !opts.background) showLoading(true);
+
+    // 2. Fetch fresh data and update in place if it differs.
     try {
-        // Fetch data from Google Sheets (sequential to avoid Apps Script concurrency locks causing 5 min hangs)
-        const rawData = await fetchSheetData(SHEETS.report);
-        const rawPipeMaster = await fetchSheetData(SHEETS.pipeMaster).catch(() => []);
-        const rawShiftLevel = await fetchSheetData(SHEETS.shiftLevel).catch(() => []);
-        const rawDayLevel = await fetchSheetData(SHEETS.dayLevel).catch(() => []);
-
-        pipeMasterData = rawPipeMaster || [];
-        updatePipeMasterOrder(pipeMasterData);
-        allData = transformReportData(rawData);
-        shiftLevelData = rawShiftLevel || [];
-        dayLevelData = rawDayLevel || [];
-
-        // Set default date filter: last 7 days for dashboard
-        setDefaultDateRange();
-
-        // Populate filter dropdowns
-        populateFilterOptions();
-
-        // Apply filters (will use default date range)
-        applyFilters();
-
-        // Set default month for summary
-        const summaryMonthInput = document.getElementById('summaryMonth');
-        if (summaryMonthInput && !summaryMonthInput.value) {
-            const now = new Date();
-            summaryMonthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        let data, sig;
+        try {
+            ({ data, sig } = await fetchBundle(opts.force));
+        } catch (bundleErr) {
+            // Older deployment that predates action=bundle — fall back so a
+            // partial rollout can never leave the dashboard empty.
+            console.warn('Bundle request failed, falling back to per-sheet:', bundleErr);
+            const sheets = await fetchAllSheetsIndividually();
+            applyBundle(sheets);
+            stampRefreshTime();
+            lastBundleSig = null;
+            showLoading(false);
+            if (!opts.background) showToast(`Loaded ${allData.length} records from Google Sheets`, 'success');
+            return;
         }
 
-        // Set default dates for custom range (Current Month)
-        const summaryStartInput = document.getElementById('summaryStartDate');
-        const summaryEndInput = document.getElementById('summaryEndDate');
-        if (summaryStartInput && summaryEndInput && !summaryStartInput.value) {
-            const now = new Date();
-            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-            const fmt = (d) => {
-                const yyyy = d.getFullYear();
-                const mm = String(d.getMonth() + 1).padStart(2, '0');
-                const dd = String(d.getDate()).padStart(2, '0');
-                return `${yyyy}-${mm}-${dd}`;
-            };
-            summaryStartInput.value = fmt(firstDay);
-            summaryEndInput.value = fmt(now);
+        if (sig !== lastBundleSig) {
+            applyBundle(unpackBundle(data));
+            lastBundleSig = sig;
+            idbSet(CACHE_KEY, { data: data, sig: sig, ts: Date.now() });
+            stampRefreshTime();
+            if (!opts.background || !painted) {
+                showToast(`Loaded ${allData.length} records from Google Sheets`, 'success');
+            }
+        } else {
+            // Nothing changed — leave the screen exactly as it is.
+            stampRefreshTime();
+            perfLog('no change', performance.now());
         }
-
-        showToast(`Loaded ${allData.length} records from Google Sheets`, 'success');
 
     } catch (err) {
         console.error('Init error:', err);
-        showToast(`Error: ${err.message}`, 'error');
+
+        if (painted) {
+            // We are already showing usable data; do not blank it out.
+            showToast(`Could not refresh: ${err.message}`, 'warning');
+        } else if (err instanceof TypeError || err.message === 'Failed to fetch') {
+            showToast('Connection Blocked (CORS). Check the Apps Script deployment is a Web App, ' +
+                'Execute as: Me, Who has access: Anyone.', 'error');
+        } else {
+            showToast(`Error: ${err.message}`, 'error');
+        }
     }
 
     showLoading(false);
@@ -3818,7 +3986,32 @@ function showLoading(show) {
     });
 }
 
-// Auto-refresh every 5 minutes
+// The Refresh button. Always goes to the server and skips every cache —
+// previously it could return data up to 10 minutes old while still showing
+// the green "Loaded N records" success toast.
+function refreshNow() {
+    return initApp({ force: true });
+}
+
+// Auto-refresh cadence. Every background refresh downloads the better part of
+// a megabyte, so it is rate-limited by time-since-last-fetch rather than by
+// how often it happens to be asked. Returning to the tab therefore catches up
+// if the data is stale, and costs nothing if it is not — without this, simply
+// alt-tabbing between windows re-fetched everything each time.
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+function maybeBackgroundRefresh() {
+    if (Date.now() - lastFetchAt < REFRESH_INTERVAL_MS) return;
+    initApp({ background: true });
+}
+
 setInterval(() => {
-    initApp();
-}, 5 * 60 * 1000);
+    if (typeof document !== 'undefined' && document.hidden) return;
+    maybeBackgroundRefresh();
+}, 60 * 1000);
+
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) maybeBackgroundRefresh();
+    });
+}
